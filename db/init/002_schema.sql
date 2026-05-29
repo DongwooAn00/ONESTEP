@@ -107,7 +107,11 @@ CREATE TABLE IF NOT EXISTS freight_tonnage_od_long (
 
 CREATE TABLE IF NOT EXISTS road_nodes (
     node_id text PRIMARY KEY,
-    geom geometry(Point, 5179) NOT NULL
+    node_type text,
+    node_name text,
+    x double precision,
+    y double precision,
+    geom geometry(Point, 100001) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS road_links (
@@ -116,8 +120,11 @@ CREATE TABLE IF NOT EXISTS road_links (
     end_node_id text REFERENCES road_nodes(node_id),
     road_name text,
     road_rank text,
+    link_category bigint,
+    oneway text,
+    lanes integer,
     length_m double precision,
-    geom geometry(LineString, 5179) NOT NULL
+    geom geometry(MultiLineString, 100001) NOT NULL
 );
 
 CREATE INDEX IF NOT EXISTS idx_od_by_mode_origin_zone ON od_by_mode(origin_zone_id);

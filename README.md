@@ -70,6 +70,19 @@ python3 scripts/preprocess_csv.py
 python3 scripts/load_postgis.py
 ```
 
+도로망 Shapefile을 DB에 적재합니다.
+
+```bash
+python3 scripts/extract_road_shapefiles.py
+python3 scripts/load_road_network.py
+```
+
+DEM 래스터를 DB에 적재합니다.
+
+```bash
+python3 scripts/load_dem.py
+```
+
 DB를 종료하려면 다음을 실행합니다.
 
 ```bash

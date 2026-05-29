@@ -3,8 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 from math import ceil, hypot
-from pathlib import Path
 
+from app.db import connect
 from app.schemas.route_cost import (
     AccessPoint,
     Coordinate,
@@ -19,9 +19,15 @@ from app.schemas.route_generation import RouteGenerationRequest
 from app.services.route_generation import generate_route_candidates
 
 
-ROOT = Path(__file__).resolve().parents[3]
-DEM_PATH = ROOT / "data" / "raw" / "한반도90m_GRS80.img"
-NODE_SHP_PATH = ROOT / "data" / "processed" / "shapefiles" / "nodes" / "ad0102_2023_GR.shp"
+DEM_PROJ4 = (
+    "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 "
+    "+x_0=200000 +y_0=600000 +ellps=GRS80 "
+    "+towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
+)
+ROAD_PROJ4 = (
+    "+proj=tmerc +lat_0=38 +lon_0=128 +k=0.9999 "
+    "+x_0=400000 +y_0=600000 +ellps=GRS80 +units=m +no_defs"
+)
 
 
 @dataclass(frozen=True)
@@ -57,26 +63,17 @@ class RoadNode:
     dem_y: float
 
 
-def _import_gdal():
-    from osgeo import gdal, ogr, osr
+def _import_osr():
+    from osgeo import osr
 
-    return gdal, ogr, osr
-
-
-@lru_cache(maxsize=1)
-def _dem_dataset():
-    gdal, _, _ = _import_gdal()
-    dataset = gdal.Open(str(DEM_PATH))
-    if dataset is None:
-        raise RuntimeError(f"DEM 파일을 열 수 없습니다: {DEM_PATH}")
-    return dataset
+    return osr
 
 
 @lru_cache(maxsize=1)
 def _spatial_refs():
-    _, _, osr = _import_gdal()
-    dem = _dem_dataset()
-    dem_srs = osr.SpatialReference(wkt=dem.GetProjection())
+    osr = _import_osr()
+    dem_srs = osr.SpatialReference()
+    dem_srs.ImportFromProj4(DEM_PROJ4)
     dem_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
 
     wgs84 = osr.SpatialReference()
@@ -84,7 +81,7 @@ def _spatial_refs():
     wgs84.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
 
     road_srs = osr.SpatialReference()
-    road_srs.ImportFromWkt(NODE_SHP_PATH.with_suffix(".prj").read_text(encoding="utf-8"))
+    road_srs.ImportFromProj4(ROAD_PROJ4)
     road_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
 
     return {
@@ -101,55 +98,74 @@ def _transform(transform, x: float, y: float) -> ProjectedPoint:
     return ProjectedPoint(tx, ty)
 
 
-@lru_cache(maxsize=1)
-def _road_nodes() -> tuple[RoadNode, ...]:
-    if not NODE_SHP_PATH.exists():
-        raise RuntimeError(
-            "도로 노드 Shapefile이 없습니다. 먼저 `python3 scripts/extract_road_shapefiles.py`를 실행하세요."
-        )
-
-    _, ogr, _ = _import_gdal()
-    dataset = ogr.Open(str(NODE_SHP_PATH))
-    if dataset is None:
-        raise RuntimeError(f"도로 노드 Shapefile을 열 수 없습니다: {NODE_SHP_PATH}")
-
-    transforms = _spatial_refs()
-    layer = dataset.GetLayer(0)
-    nodes: list[RoadNode] = []
-
-    for feature in layer:
-        node_id = str(feature.GetField("NODE_ID"))
-        x = float(feature.GetField("X"))
-        y = float(feature.GetField("Y"))
-        wgs84 = _transform(transforms["road_to_wgs84"], x, y)
-        dem = _transform(transforms["road_to_dem"], x, y)
-        nodes.append(RoadNode(node_id=node_id, x=x, y=y, lon=wgs84.x, lat=wgs84.y, dem_x=dem.x, dem_y=dem.y))
-
-    return tuple(nodes)
-
-
 def _nearest_road_node(lat: float, lon: float) -> tuple[RoadNode, float]:
     transforms = _spatial_refs()
     road_point = _transform(transforms["wgs84_to_road"], lon, lat)
-    nearest = min(_road_nodes(), key=lambda node: (node.x - road_point.x) ** 2 + (node.y - road_point.y) ** 2)
-    distance_m = hypot(nearest.x - road_point.x, nearest.y - road_point.y)
-    return nearest, distance_m
+
+    with connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH input_point AS (
+                    SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100001) AS geom
+                )
+                SELECT
+                    road_nodes.node_id,
+                    road_nodes.x,
+                    road_nodes.y,
+                    ST_Distance(road_nodes.geom, input_point.geom) AS distance_m
+                FROM road_nodes, input_point
+                ORDER BY road_nodes.geom <-> input_point.geom
+                LIMIT 1;
+                """,
+                (road_point.x, road_point.y),
+            )
+            row = cursor.fetchone()
+
+    if row is None:
+        raise RuntimeError("DB의 road_nodes 테이블에 도로 노드가 없습니다.")
+
+    node_id, x, y, distance_m = row
+    wgs84 = _transform(transforms["road_to_wgs84"], x, y)
+    dem = _transform(transforms["road_to_dem"], x, y)
+    return (
+        RoadNode(
+            node_id=str(node_id),
+            x=float(x),
+            y=float(y),
+            lon=wgs84.x,
+            lat=wgs84.y,
+            dem_x=dem.x,
+            dem_y=dem.y,
+        ),
+        float(distance_m),
+    )
 
 
 def _sample_elevation(dem_x: float, dem_y: float) -> float:
-    dataset = _dem_dataset()
-    gt = dataset.GetGeoTransform()
-    px = int((dem_x - gt[0]) / gt[1])
-    py = int((dem_y - gt[3]) / gt[5])
-    if px < 0 or py < 0 or px >= dataset.RasterXSize or py >= dataset.RasterYSize:
+    with connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH input_point AS (
+                    SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100002) AS geom
+                )
+                SELECT ST_Value(dem_elevation.rast, 1, input_point.geom) AS elevation_m
+                FROM dem_elevation, input_point
+                WHERE ST_Intersects(dem_elevation.rast, input_point.geom)
+                LIMIT 1;
+                """,
+                (dem_x, dem_y),
+            )
+            row = cursor.fetchone()
+
+    if row is None:
         raise ValueError("입력 좌표가 DEM 범위를 벗어났습니다.")
 
-    band = dataset.GetRasterBand(1)
-    value = float(band.ReadAsArray(px, py, 1, 1)[0][0])
-    nodata = band.GetNoDataValue()
-    if nodata is not None and value == nodata:
+    value = row[0]
+    if value is None or float(value) == -9999:
         raise ValueError("입력 좌표의 DEM 고도값이 비어 있습니다.")
-    return value
+    return float(value)
 
 
 def _interpolate_polyline(points: list[ProjectedPoint], interval_m: float) -> list[ProjectedPoint]:
