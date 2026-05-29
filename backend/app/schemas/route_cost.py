@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class RouteCostRequest(BaseModel):
@@ -16,6 +16,14 @@ class RouteCostRequest(BaseModel):
 class Coordinate(BaseModel):
     lat: float
     lon: float
+
+
+class CostParameters(BaseModel):
+    rock_factor: float = Field(default=1.15, ge=0.5, le=3.0)
+    sample_interval_m: float = Field(default=90, ge=30, le=500)
+    road_unit_cost_billion_krw_per_km: float = Field(default=12, ge=0)
+    tunnel_unit_cost_billion_krw_per_km: float = Field(default=80, ge=0)
+    steep_road_factor: float = Field(default=1.3, ge=1)
 
 
 class AccessPoint(BaseModel):
@@ -43,6 +51,22 @@ class RouteCandidate(BaseModel):
     estimated_cost_billion_krw: float
     segments: list[RouteSegment]
     coordinates: list[Coordinate]
+
+
+class EvaluateRouteRequest(CostParameters):
+    name: str = Field(default="candidate")
+    coordinates: list[Coordinate] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def validate_distinct_coordinates(self) -> "EvaluateRouteRequest":
+        unique_coordinates = {(coordinate.lat, coordinate.lon) for coordinate in self.coordinates}
+        if len(unique_coordinates) < 2:
+            raise ValueError("서로 다른 좌표가 2개 이상 필요합니다.")
+        return self
+
+
+class EvaluateRouteResult(BaseModel):
+    candidate: RouteCandidate
 
 
 class RouteCostResult(BaseModel):

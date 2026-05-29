@@ -2,17 +2,21 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from math import ceil, cos, hypot, radians
+from math import ceil, hypot
 from pathlib import Path
 
 from app.schemas.route_cost import (
     AccessPoint,
     Coordinate,
+    EvaluateRouteRequest,
+    EvaluateRouteResult,
     RouteCandidate,
     RouteCostRequest,
     RouteCostResult,
     RouteSegment,
 )
+from app.schemas.route_generation import RouteGenerationRequest
+from app.services.route_generation import generate_route_candidates
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -148,25 +152,6 @@ def _sample_elevation(dem_x: float, dem_y: float) -> float:
     return value
 
 
-def _candidate_lines(start: ProjectedPoint, end: ProjectedPoint) -> list[tuple[str, list[ProjectedPoint]]]:
-    dx = end.x - start.x
-    dy = end.y - start.y
-    distance = hypot(dx, dy)
-    if distance == 0:
-        raise ValueError("출발지와 도착지가 너무 가깝습니다.")
-
-    normal_x = -dy / distance
-    normal_y = dx / distance
-    offset = min(max(distance * 0.2, 500), 3000)
-    mid = ProjectedPoint((start.x + end.x) / 2, (start.y + end.y) / 2)
-
-    return [
-        ("straight", [start, end]),
-        ("left_bypass", [start, ProjectedPoint(mid.x + normal_x * offset, mid.y + normal_y * offset), end]),
-        ("right_bypass", [start, ProjectedPoint(mid.x - normal_x * offset, mid.y - normal_y * offset), end]),
-    ]
-
-
 def _interpolate_polyline(points: list[ProjectedPoint], interval_m: float) -> list[ProjectedPoint]:
     output = [points[0]]
     for start, end in zip(points, points[1:]):
@@ -195,6 +180,20 @@ def _sample_line(points: list[ProjectedPoint], interval_m: float) -> list[Sample
             )
         )
     return samples
+
+
+def _coordinates_to_dem_points(coordinates: list[Coordinate]) -> list[ProjectedPoint]:
+    transforms = _spatial_refs()
+    return [_transform(transforms["wgs84_to_dem"], coordinate.lon, coordinate.lat) for coordinate in coordinates]
+
+
+def _dem_points_to_coordinates(points: list[ProjectedPoint]) -> list[Coordinate]:
+    transforms = _spatial_refs()
+    coordinates = []
+    for point in points:
+        wgs84 = _transform(transforms["dem_to_wgs84"], point.x, point.y)
+        coordinates.append(Coordinate(lat=wgs84.y, lon=wgs84.x))
+    return coordinates
 
 
 def classify_profile(
@@ -309,40 +308,86 @@ def _estimate_cost(
     return round(cost, 3)
 
 
+def evaluate_route_candidate(
+    name: str,
+    coordinates: list[Coordinate],
+    sample_interval_m: float,
+    road_unit_cost: float,
+    tunnel_unit_cost: float,
+    steep_road_factor: float,
+    rock_factor: float,
+) -> RouteCandidate:
+    control_points = _coordinates_to_dem_points(coordinates)
+    samples = _sample_line(control_points, sample_interval_m)
+    classified = classify_profile(samples)
+    total_length = sum(segment.length_m for segment in classified)
+    road_length = sum(segment.length_m for segment in classified if segment.segment_type == "road")
+    steep_length = sum(segment.length_m for segment in classified if segment.segment_type == "steep_road")
+    tunnel_length = sum(segment.length_m for segment in classified if segment.segment_type == "tunnel")
+
+    return RouteCandidate(
+        name=name,
+        total_length_m=round(total_length, 1),
+        road_length_m=round(road_length, 1),
+        steep_road_length_m=round(steep_length, 1),
+        tunnel_length_m=round(tunnel_length, 1),
+        max_slope_percent=round(max((segment.slope_percent for segment in classified), default=0), 2),
+        min_elevation_m=round(min(sample.elevation_m for sample in samples), 2),
+        max_elevation_m=round(max(sample.elevation_m for sample in samples), 2),
+        estimated_cost_billion_krw=_estimate_cost(
+            classified,
+            road_unit_cost,
+            tunnel_unit_cost,
+            steep_road_factor,
+            rock_factor,
+        ),
+        segments=_summarize_segments(classified),
+        coordinates=[Coordinate(lat=sample.lat, lon=sample.lon) for sample in samples],
+    )
+
+
+def evaluate_route(payload: EvaluateRouteRequest) -> EvaluateRouteResult:
+    return EvaluateRouteResult(
+        candidate=evaluate_route_candidate(
+            name=payload.name,
+            coordinates=payload.coordinates,
+            sample_interval_m=payload.sample_interval_m,
+            road_unit_cost=payload.road_unit_cost_billion_krw_per_km,
+            tunnel_unit_cost=payload.tunnel_unit_cost_billion_krw_per_km,
+            steep_road_factor=payload.steep_road_factor,
+            rock_factor=payload.rock_factor,
+        )
+    )
+
+
 def analyze_route_cost(payload: RouteCostRequest) -> RouteCostResult:
     start_node, start_distance = _nearest_road_node(payload.start_lat, payload.start_lon)
     end_node, end_distance = _nearest_road_node(payload.end_lat, payload.end_lon)
-    start = ProjectedPoint(start_node.dem_x, start_node.dem_y)
-    end = ProjectedPoint(end_node.dem_x, end_node.dem_y)
 
     candidates: list[RouteCandidate] = []
-    for name, control_points in _candidate_lines(start, end):
-        samples = _sample_line(control_points, payload.sample_interval_m)
-        classified = classify_profile(samples)
-        total_length = sum(segment.length_m for segment in classified)
-        road_length = sum(segment.length_m for segment in classified if segment.segment_type == "road")
-        steep_length = sum(segment.length_m for segment in classified if segment.segment_type == "steep_road")
-        tunnel_length = sum(segment.length_m for segment in classified if segment.segment_type == "tunnel")
-
+    generation_result = generate_route_candidates(
+        payload=RouteGenerationRequest(
+            start_lat=payload.start_lat,
+            start_lon=payload.start_lon,
+            end_lat=payload.end_lat,
+            end_lon=payload.end_lon,
+            rock_factor=payload.rock_factor,
+            sample_interval_m=payload.sample_interval_m,
+            road_unit_cost_billion_krw_per_km=payload.road_unit_cost_billion_krw_per_km,
+            tunnel_unit_cost_billion_krw_per_km=payload.tunnel_unit_cost_billion_krw_per_km,
+            steep_road_factor=payload.steep_road_factor,
+        )
+    )
+    for generated in generation_result.candidates:
         candidates.append(
-            RouteCandidate(
-                name=name,
-                total_length_m=round(total_length, 1),
-                road_length_m=round(road_length, 1),
-                steep_road_length_m=round(steep_length, 1),
-                tunnel_length_m=round(tunnel_length, 1),
-                max_slope_percent=round(max((segment.slope_percent for segment in classified), default=0), 2),
-                min_elevation_m=round(min(sample.elevation_m for sample in samples), 2),
-                max_elevation_m=round(max(sample.elevation_m for sample in samples), 2),
-                estimated_cost_billion_krw=_estimate_cost(
-                    classified,
-                    payload.road_unit_cost_billion_krw_per_km,
-                    payload.tunnel_unit_cost_billion_krw_per_km,
-                    payload.steep_road_factor,
-                    payload.rock_factor,
-                ),
-                segments=_summarize_segments(classified),
-                coordinates=[Coordinate(lat=sample.lat, lon=sample.lon) for sample in samples],
+            evaluate_route_candidate(
+                name=generated.name,
+                coordinates=generated.coordinates,
+                sample_interval_m=payload.sample_interval_m,
+                road_unit_cost=payload.road_unit_cost_billion_krw_per_km,
+                tunnel_unit_cost=payload.tunnel_unit_cost_billion_krw_per_km,
+                steep_road_factor=payload.steep_road_factor,
+                rock_factor=payload.rock_factor,
             )
         )
 
