@@ -41,6 +41,16 @@ uvicorn app.main:app --reload
 
 ## 로컬 DB 실행
 
+다음 과정을 진행하면 이미 전처리된 파일들을 로컬 DB에 적재할 수 있습니다.
+
+```bash
+docker compose up -d
+python3 scripts/load_postgis.py
+python3 scripts/load_road_network.py
+python3 scripts/load_dem.py
+```
+## 기존 방식
+
 PostgreSQL + PostGIS를 Docker로 실행합니다.
 
 ```bash
