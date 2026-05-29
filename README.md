@@ -39,6 +39,51 @@ uvicorn app.main:app --reload
 
 기본 주소는 `http://localhost:8000`입니다.
 
+## 로컬 DB 실행
+
+PostgreSQL + PostGIS를 Docker로 실행합니다.
+
+```bash
+docker compose up -d
+```
+
+기본 접속 정보는 다음과 같습니다.
+
+```text
+host: localhost
+port: 5432
+database: onestep
+user: onestep
+password: onestep
+```
+
+애플리케이션에서는 아래 환경변수 형식을 사용합니다.
+
+```bash
+DATABASE_URL=postgresql://onestep:onestep@localhost:5432/onestep
+```
+
+CSV 전처리 결과를 DB에 적재합니다.
+
+```bash
+python3 scripts/preprocess_csv.py
+python3 scripts/load_postgis.py
+```
+
+DB를 종료하려면 다음을 실행합니다.
+
+```bash
+docker compose down
+```
+
+DB 데이터를 완전히 초기화하려면 볼륨까지 삭제합니다.
+
+```bash
+docker compose down -v
+docker compose up -d
+python3 scripts/load_postgis.py
+```
+
 GDAL을 사용하는 DEM/도로망 분석 기능은 로컬 GDAL 설치가 필요합니다.
 
 ```bash

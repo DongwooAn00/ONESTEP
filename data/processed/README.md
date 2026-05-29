@@ -8,6 +8,7 @@
 - `od_by_mode.csv`: 수단별 여객 O/D
 - `od_by_purpose.csv`: 목적별 여객 O/D
 - `freight_vehicle_od.csv`: 화물자동차 O/D, 단위 대/일
+- `freight_item_codes.csv`: 화물물동량 품목 코드 기준 테이블
 - `freight_tonnage_od.csv`: 화물물동량 O/D, 단위 톤/년, wide 형식
 - `freight_tonnage_od_long.csv`: 화물물동량 O/D, 품목별 long 형식
 
@@ -25,3 +26,4 @@
 - `od_by_mode.csv`, `od_by_purpose.csv`는 원본 합계와 세부 항목 합계 사이에 최대 2 수준의 차이가 있습니다. 원본의 반올림 또는 집계 처리 차이로 보고 원본 합계를 유지합니다.
 - `freight_vehicle_od.csv`는 세부 차종 합계와 `total`이 일치합니다.
 - `freight_tonnage_od.csv`의 `total`은 `container`를 포함한 단순 합계로 보이지 않는 행이 있습니다. 따라서 `total`과 `container`는 모두 원본 값을 보존하고, 품목 합산 검증에서는 별도 해석이 필요합니다.
+- 화물 O/D 설명자료 기준 품목 코드에는 `item_07`, `item_08`이 있으나, 현재 원본 화물물동량 O/D CSV에는 해당 컬럼이 없습니다. 기준 테이블에는 보존하고 실제 long 데이터에는 나타나지 않습니다.
