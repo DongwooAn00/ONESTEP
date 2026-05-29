@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.vite/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+.env
+.DS_Store
+
+data/raw/
+data/processed/csv/
+data/processed/shapefiles/

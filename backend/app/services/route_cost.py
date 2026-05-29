@@ -1,0 +1,364 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from functools import lru_cache
+from math import ceil, cos, hypot, radians
+from pathlib import Path
+
+from app.schemas.route_cost import (
+    AccessPoint,
+    Coordinate,
+    RouteCandidate,
+    RouteCostRequest,
+    RouteCostResult,
+    RouteSegment,
+)
+
+
+ROOT = Path(__file__).resolve().parents[3]
+DEM_PATH = ROOT / "data" / "raw" / "한반도90m_GRS80.img"
+NODE_SHP_PATH = ROOT / "data" / "processed" / "shapefiles" / "nodes" / "ad0102_2023_GR.shp"
+
+
+@dataclass(frozen=True)
+class ProjectedPoint:
+    x: float
+    y: float
+
+
+@dataclass(frozen=True)
+class SamplePoint:
+    x: float
+    y: float
+    lon: float
+    lat: float
+    elevation_m: float
+
+
+@dataclass(frozen=True)
+class ClassifiedSegment:
+    segment_type: str
+    length_m: float
+    slope_percent: float
+
+
+@dataclass(frozen=True)
+class RoadNode:
+    node_id: str
+    x: float
+    y: float
+    lon: float
+    lat: float
+    dem_x: float
+    dem_y: float
+
+
+def _import_gdal():
+    from osgeo import gdal, ogr, osr
+
+    return gdal, ogr, osr
+
+
+@lru_cache(maxsize=1)
+def _dem_dataset():
+    gdal, _, _ = _import_gdal()
+    dataset = gdal.Open(str(DEM_PATH))
+    if dataset is None:
+        raise RuntimeError(f"DEM 파일을 열 수 없습니다: {DEM_PATH}")
+    return dataset
+
+
+@lru_cache(maxsize=1)
+def _spatial_refs():
+    _, _, osr = _import_gdal()
+    dem = _dem_dataset()
+    dem_srs = osr.SpatialReference(wkt=dem.GetProjection())
+    dem_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+
+    wgs84 = osr.SpatialReference()
+    wgs84.ImportFromEPSG(4326)
+    wgs84.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+
+    road_srs = osr.SpatialReference()
+    road_srs.ImportFromWkt(NODE_SHP_PATH.with_suffix(".prj").read_text(encoding="utf-8"))
+    road_srs.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
+
+    return {
+        "wgs84_to_dem": osr.CoordinateTransformation(wgs84, dem_srs),
+        "dem_to_wgs84": osr.CoordinateTransformation(dem_srs, wgs84),
+        "wgs84_to_road": osr.CoordinateTransformation(wgs84, road_srs),
+        "road_to_wgs84": osr.CoordinateTransformation(road_srs, wgs84),
+        "road_to_dem": osr.CoordinateTransformation(road_srs, dem_srs),
+    }
+
+
+def _transform(transform, x: float, y: float) -> ProjectedPoint:
+    tx, ty, _ = transform.TransformPoint(x, y)
+    return ProjectedPoint(tx, ty)
+
+
+@lru_cache(maxsize=1)
+def _road_nodes() -> tuple[RoadNode, ...]:
+    if not NODE_SHP_PATH.exists():
+        raise RuntimeError(
+            "도로 노드 Shapefile이 없습니다. 먼저 `python3 scripts/extract_road_shapefiles.py`를 실행하세요."
+        )
+
+    _, ogr, _ = _import_gdal()
+    dataset = ogr.Open(str(NODE_SHP_PATH))
+    if dataset is None:
+        raise RuntimeError(f"도로 노드 Shapefile을 열 수 없습니다: {NODE_SHP_PATH}")
+
+    transforms = _spatial_refs()
+    layer = dataset.GetLayer(0)
+    nodes: list[RoadNode] = []
+
+    for feature in layer:
+        node_id = str(feature.GetField("NODE_ID"))
+        x = float(feature.GetField("X"))
+        y = float(feature.GetField("Y"))
+        wgs84 = _transform(transforms["road_to_wgs84"], x, y)
+        dem = _transform(transforms["road_to_dem"], x, y)
+        nodes.append(RoadNode(node_id=node_id, x=x, y=y, lon=wgs84.x, lat=wgs84.y, dem_x=dem.x, dem_y=dem.y))
+
+    return tuple(nodes)
+
+
+def _nearest_road_node(lat: float, lon: float) -> tuple[RoadNode, float]:
+    transforms = _spatial_refs()
+    road_point = _transform(transforms["wgs84_to_road"], lon, lat)
+    nearest = min(_road_nodes(), key=lambda node: (node.x - road_point.x) ** 2 + (node.y - road_point.y) ** 2)
+    distance_m = hypot(nearest.x - road_point.x, nearest.y - road_point.y)
+    return nearest, distance_m
+
+
+def _sample_elevation(dem_x: float, dem_y: float) -> float:
+    dataset = _dem_dataset()
+    gt = dataset.GetGeoTransform()
+    px = int((dem_x - gt[0]) / gt[1])
+    py = int((dem_y - gt[3]) / gt[5])
+    if px < 0 or py < 0 or px >= dataset.RasterXSize or py >= dataset.RasterYSize:
+        raise ValueError("입력 좌표가 DEM 범위를 벗어났습니다.")
+
+    band = dataset.GetRasterBand(1)
+    value = float(band.ReadAsArray(px, py, 1, 1)[0][0])
+    nodata = band.GetNoDataValue()
+    if nodata is not None and value == nodata:
+        raise ValueError("입력 좌표의 DEM 고도값이 비어 있습니다.")
+    return value
+
+
+def _candidate_lines(start: ProjectedPoint, end: ProjectedPoint) -> list[tuple[str, list[ProjectedPoint]]]:
+    dx = end.x - start.x
+    dy = end.y - start.y
+    distance = hypot(dx, dy)
+    if distance == 0:
+        raise ValueError("출발지와 도착지가 너무 가깝습니다.")
+
+    normal_x = -dy / distance
+    normal_y = dx / distance
+    offset = min(max(distance * 0.2, 500), 3000)
+    mid = ProjectedPoint((start.x + end.x) / 2, (start.y + end.y) / 2)
+
+    return [
+        ("straight", [start, end]),
+        ("left_bypass", [start, ProjectedPoint(mid.x + normal_x * offset, mid.y + normal_y * offset), end]),
+        ("right_bypass", [start, ProjectedPoint(mid.x - normal_x * offset, mid.y - normal_y * offset), end]),
+    ]
+
+
+def _interpolate_polyline(points: list[ProjectedPoint], interval_m: float) -> list[ProjectedPoint]:
+    output = [points[0]]
+    for start, end in zip(points, points[1:]):
+        dx = end.x - start.x
+        dy = end.y - start.y
+        length = hypot(dx, dy)
+        steps = max(1, ceil(length / interval_m))
+        for index in range(1, steps + 1):
+            ratio = index / steps
+            output.append(ProjectedPoint(start.x + dx * ratio, start.y + dy * ratio))
+    return output
+
+
+def _sample_line(points: list[ProjectedPoint], interval_m: float) -> list[SamplePoint]:
+    transforms = _spatial_refs()
+    samples = []
+    for point in _interpolate_polyline(points, interval_m):
+        wgs84 = _transform(transforms["dem_to_wgs84"], point.x, point.y)
+        samples.append(
+            SamplePoint(
+                x=point.x,
+                y=point.y,
+                lon=wgs84.x,
+                lat=wgs84.y,
+                elevation_m=_sample_elevation(point.x, point.y),
+            )
+        )
+    return samples
+
+
+def classify_profile(
+    samples: list[SamplePoint],
+    tunnel_slope_percent: float = 15,
+    steep_slope_percent: float = 8,
+    min_tunnel_run_m: float = 300,
+    merge_gap_m: float = 100,
+) -> list[ClassifiedSegment]:
+    segments = []
+    for start, end in zip(samples, samples[1:]):
+        length = hypot(end.x - start.x, end.y - start.y)
+        slope = abs(end.elevation_m - start.elevation_m) / length * 100 if length else 0
+        if slope >= tunnel_slope_percent:
+            segment_type = "tunnel"
+        elif slope >= steep_slope_percent:
+            segment_type = "steep_road"
+        else:
+            segment_type = "road"
+        segments.append(ClassifiedSegment(segment_type, length, slope))
+
+    segments = _downgrade_short_tunnels(segments, min_tunnel_run_m)
+    return _merge_tunnel_gaps(segments, merge_gap_m)
+
+
+def _downgrade_short_tunnels(
+    segments: list[ClassifiedSegment], min_tunnel_run_m: float
+) -> list[ClassifiedSegment]:
+    result = list(segments)
+    index = 0
+    while index < len(result):
+        if result[index].segment_type != "tunnel":
+            index += 1
+            continue
+        end = index
+        length = 0.0
+        while end < len(result) and result[end].segment_type == "tunnel":
+            length += result[end].length_m
+            end += 1
+        if length < min_tunnel_run_m:
+            for cursor in range(index, end):
+                result[cursor] = ClassifiedSegment("steep_road", result[cursor].length_m, result[cursor].slope_percent)
+        index = end
+    return result
+
+
+def _merge_tunnel_gaps(segments: list[ClassifiedSegment], merge_gap_m: float) -> list[ClassifiedSegment]:
+    result = list(segments)
+    index = 1
+    while index < len(result) - 1:
+        if result[index].segment_type == "tunnel":
+            index += 1
+            continue
+        gap_start = index
+        gap_length = 0.0
+        while index < len(result) and result[index].segment_type != "tunnel":
+            gap_length += result[index].length_m
+            index += 1
+        has_tunnel_before = gap_start > 0 and result[gap_start - 1].segment_type == "tunnel"
+        has_tunnel_after = index < len(result) and result[index].segment_type == "tunnel"
+        if has_tunnel_before and has_tunnel_after and gap_length <= merge_gap_m:
+            for cursor in range(gap_start, index):
+                result[cursor] = ClassifiedSegment("tunnel", result[cursor].length_m, result[cursor].slope_percent)
+    return result
+
+
+def _summarize_segments(segments: list[ClassifiedSegment]) -> list[RouteSegment]:
+    if not segments:
+        return []
+
+    summarized: list[RouteSegment] = []
+    current_type = segments[0].segment_type
+    current: list[ClassifiedSegment] = []
+
+    for segment in segments:
+        if segment.segment_type != current_type:
+            summarized.append(_to_route_segment(current_type, current))
+            current = []
+            current_type = segment.segment_type
+        current.append(segment)
+    summarized.append(_to_route_segment(current_type, current))
+    return summarized
+
+
+def _to_route_segment(segment_type: str, segments: list[ClassifiedSegment]) -> RouteSegment:
+    length = sum(segment.length_m for segment in segments)
+    weighted_slope = sum(segment.slope_percent * segment.length_m for segment in segments) / length if length else 0
+    max_slope = max((segment.slope_percent for segment in segments), default=0)
+    return RouteSegment(
+        segment_type=segment_type,
+        length_m=round(length, 1),
+        average_slope_percent=round(weighted_slope, 2),
+        max_slope_percent=round(max_slope, 2),
+    )
+
+
+def _estimate_cost(
+    segments: list[ClassifiedSegment],
+    road_unit_cost: float,
+    tunnel_unit_cost: float,
+    steep_road_factor: float,
+    rock_factor: float,
+) -> float:
+    road_m = sum(segment.length_m for segment in segments if segment.segment_type == "road")
+    steep_m = sum(segment.length_m for segment in segments if segment.segment_type == "steep_road")
+    tunnel_m = sum(segment.length_m for segment in segments if segment.segment_type == "tunnel")
+    cost = (
+        road_m / 1000 * road_unit_cost
+        + steep_m / 1000 * road_unit_cost * steep_road_factor
+        + tunnel_m / 1000 * tunnel_unit_cost * rock_factor
+    )
+    return round(cost, 3)
+
+
+def analyze_route_cost(payload: RouteCostRequest) -> RouteCostResult:
+    start_node, start_distance = _nearest_road_node(payload.start_lat, payload.start_lon)
+    end_node, end_distance = _nearest_road_node(payload.end_lat, payload.end_lon)
+    start = ProjectedPoint(start_node.dem_x, start_node.dem_y)
+    end = ProjectedPoint(end_node.dem_x, end_node.dem_y)
+
+    candidates: list[RouteCandidate] = []
+    for name, control_points in _candidate_lines(start, end):
+        samples = _sample_line(control_points, payload.sample_interval_m)
+        classified = classify_profile(samples)
+        total_length = sum(segment.length_m for segment in classified)
+        road_length = sum(segment.length_m for segment in classified if segment.segment_type == "road")
+        steep_length = sum(segment.length_m for segment in classified if segment.segment_type == "steep_road")
+        tunnel_length = sum(segment.length_m for segment in classified if segment.segment_type == "tunnel")
+
+        candidates.append(
+            RouteCandidate(
+                name=name,
+                total_length_m=round(total_length, 1),
+                road_length_m=round(road_length, 1),
+                steep_road_length_m=round(steep_length, 1),
+                tunnel_length_m=round(tunnel_length, 1),
+                max_slope_percent=round(max((segment.slope_percent for segment in classified), default=0), 2),
+                min_elevation_m=round(min(sample.elevation_m for sample in samples), 2),
+                max_elevation_m=round(max(sample.elevation_m for sample in samples), 2),
+                estimated_cost_billion_krw=_estimate_cost(
+                    classified,
+                    payload.road_unit_cost_billion_krw_per_km,
+                    payload.tunnel_unit_cost_billion_krw_per_km,
+                    payload.steep_road_factor,
+                    payload.rock_factor,
+                ),
+                segments=_summarize_segments(classified),
+                coordinates=[Coordinate(lat=sample.lat, lon=sample.lon) for sample in samples],
+            )
+        )
+
+    recommended = min(candidates, key=lambda candidate: candidate.estimated_cost_billion_krw)
+
+    return RouteCostResult(
+        start_access=AccessPoint(
+            node_id=start_node.node_id,
+            distance_m=round(start_distance, 1),
+            coordinate=Coordinate(lat=start_node.lat, lon=start_node.lon),
+        ),
+        end_access=AccessPoint(
+            node_id=end_node.node_id,
+            distance_m=round(end_distance, 1),
+            coordinate=Coordinate(lat=end_node.lat, lon=end_node.lon),
+        ),
+        recommended_candidate=recommended.name,
+        candidates=candidates,
+    )
