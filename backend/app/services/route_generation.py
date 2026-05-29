@@ -8,6 +8,7 @@ from app.schemas.route_generation import (
     RouteGenerationRequest,
     RouteGenerationResult,
 )
+from app.services.road_network import nearest_road_node
 
 
 def _lon_lat_to_local_meters(lon: float, lat: float, ref_lat: float) -> tuple[float, float]:
@@ -69,13 +70,17 @@ def _candidate_lines(
 
 
 def generate_route_candidates(payload: RouteGenerationRequest) -> RouteGenerationResult:
+    # DB 도로망 접속점은 후보 생성 알고리즘의 시작/끝 앵커로 사용한다.
+    start_access = nearest_road_node(payload.start_lat, payload.start_lon)
+    end_access = nearest_road_node(payload.end_lat, payload.end_lon)
+
     # MVP 기본값. 이후 알고리즘 팀원이 이 함수의 내부 생성 방식을 교체하면 된다.
     candidates: list[GeneratedRouteCandidate] = []
     for name, points in _candidate_lines(
-        payload.start_lon,
-        payload.start_lat,
-        payload.end_lon,
-        payload.end_lat,
+        start_access.coordinate.lon,
+        start_access.coordinate.lat,
+        end_access.coordinate.lon,
+        end_access.coordinate.lat,
     )[
         : payload.candidate_count
     ]:

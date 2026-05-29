@@ -16,6 +16,7 @@ from app.schemas.route_cost import (
     RouteSegment,
 )
 from app.schemas.route_generation import RouteGenerationRequest
+from app.services.road_network import ROAD_PROJ4, nearest_road_node
 from app.services.route_generation import generate_route_candidates
 
 
@@ -23,10 +24,6 @@ DEM_PROJ4 = (
     "+proj=tmerc +lat_0=38 +lon_0=127 +k=1 "
     "+x_0=200000 +y_0=600000 +ellps=GRS80 "
     "+towgs84=0,0,0,0,0,0,0 +units=m +no_defs"
-)
-ROAD_PROJ4 = (
-    "+proj=tmerc +lat_0=38 +lon_0=128 +k=0.9999 "
-    "+x_0=400000 +y_0=600000 +ellps=GRS80 +units=m +no_defs"
 )
 
 
@@ -99,46 +96,20 @@ def _transform(transform, x: float, y: float) -> ProjectedPoint:
 
 
 def _nearest_road_node(lat: float, lon: float) -> tuple[RoadNode, float]:
+    access_point = nearest_road_node(lat, lon)
     transforms = _spatial_refs()
-    road_point = _transform(transforms["wgs84_to_road"], lon, lat)
-
-    with connect() as connection:
-        with connection.cursor() as cursor:
-            cursor.execute(
-                """
-                WITH input_point AS (
-                    SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100001) AS geom
-                )
-                SELECT
-                    road_nodes.node_id,
-                    road_nodes.x,
-                    road_nodes.y,
-                    ST_Distance(road_nodes.geom, input_point.geom) AS distance_m
-                FROM road_nodes, input_point
-                ORDER BY road_nodes.geom <-> input_point.geom
-                LIMIT 1;
-                """,
-                (road_point.x, road_point.y),
-            )
-            row = cursor.fetchone()
-
-    if row is None:
-        raise RuntimeError("DB의 road_nodes 테이블에 도로 노드가 없습니다.")
-
-    node_id, x, y, distance_m = row
-    wgs84 = _transform(transforms["road_to_wgs84"], x, y)
-    dem = _transform(transforms["road_to_dem"], x, y)
+    dem = _transform(transforms["wgs84_to_dem"], access_point.coordinate.lon, access_point.coordinate.lat)
     return (
         RoadNode(
-            node_id=str(node_id),
-            x=float(x),
-            y=float(y),
-            lon=wgs84.x,
-            lat=wgs84.y,
+            node_id=access_point.node_id,
+            x=access_point.road_x,
+            y=access_point.road_y,
+            lon=access_point.coordinate.lon,
+            lat=access_point.coordinate.lat,
             dem_x=dem.x,
             dem_y=dem.y,
         ),
-        float(distance_m),
+        access_point.distance_m,
     )
 
 

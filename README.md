@@ -132,3 +132,9 @@ python3 scripts/preprocess_csv.py
 ```bash
 python3 scripts/extract_road_shapefiles.py
 ```
+
+## 개발 문서
+
+- `docs/route-generation-guide.md`: 후보 도로 생성 파트 구현 가이드
+- `docs/route-contract.md`: 후보 생성/평가 API 입출력 규약
+- `docs/route-cost-pipeline.md`: 후보 생성 이후 평가 파이프라인
