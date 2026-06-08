@@ -29,6 +29,38 @@ CREATE TABLE IF NOT EXISTS od_by_mode (
     PRIMARY KEY (origin_zone_id, destination_zone_id)
 );
 
+CREATE TABLE IF NOT EXISTS admin_dongs (
+    admin_dong_code text PRIMARY KEY,
+    province_id integer NOT NULL,
+    zone_id integer NOT NULL REFERENCES zones(zone_id),
+    province_name text NOT NULL,
+    district_name text NOT NULL,
+    dong_name text NOT NULL,
+    population integer NOT NULL,
+    population_source text NOT NULL,
+    origin_weight double precision NOT NULL,
+    destination_weight double precision NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS admin_dong_od_by_mode (
+    origin_province_id integer NOT NULL,
+    destination_province_id integer NOT NULL,
+    origin_zone_id integer NOT NULL REFERENCES zones(zone_id),
+    destination_zone_id integer NOT NULL REFERENCES zones(zone_id),
+    origin_admin_dong_code text NOT NULL REFERENCES admin_dongs(admin_dong_code),
+    destination_admin_dong_code text NOT NULL REFERENCES admin_dongs(admin_dong_code),
+    passenger_car integer NOT NULL,
+    bus integer NOT NULL,
+    subway integer NOT NULL,
+    rail integer NOT NULL,
+    high_speed_rail integer NOT NULL,
+    air integer NOT NULL,
+    sea integer NOT NULL,
+    total integer NOT NULL,
+    data_source text NOT NULL,
+    PRIMARY KEY (origin_admin_dong_code, destination_admin_dong_code)
+);
+
 CREATE TABLE IF NOT EXISTS od_by_purpose (
     origin_province_id integer NOT NULL,
     destination_province_id integer NOT NULL,
@@ -129,6 +161,13 @@ CREATE TABLE IF NOT EXISTS road_links (
 
 CREATE INDEX IF NOT EXISTS idx_od_by_mode_origin_zone ON od_by_mode(origin_zone_id);
 CREATE INDEX IF NOT EXISTS idx_od_by_mode_destination_zone ON od_by_mode(destination_zone_id);
+CREATE INDEX IF NOT EXISTS idx_admin_dongs_zone ON admin_dongs(zone_id);
+CREATE INDEX IF NOT EXISTS idx_admin_dongs_province ON admin_dongs(province_id);
+CREATE INDEX IF NOT EXISTS idx_admin_dong_od_origin ON admin_dong_od_by_mode(origin_admin_dong_code);
+CREATE INDEX IF NOT EXISTS idx_admin_dong_od_destination ON admin_dong_od_by_mode(destination_admin_dong_code);
+CREATE INDEX IF NOT EXISTS idx_admin_dong_od_origin_zone ON admin_dong_od_by_mode(origin_zone_id);
+CREATE INDEX IF NOT EXISTS idx_admin_dong_od_destination_zone ON admin_dong_od_by_mode(destination_zone_id);
+CREATE INDEX IF NOT EXISTS idx_admin_dong_od_data_source ON admin_dong_od_by_mode(data_source);
 CREATE INDEX IF NOT EXISTS idx_od_by_purpose_origin_zone ON od_by_purpose(origin_zone_id);
 CREATE INDEX IF NOT EXISTS idx_od_by_purpose_destination_zone ON od_by_purpose(destination_zone_id);
 CREATE INDEX IF NOT EXISTS idx_freight_vehicle_origin_zone ON freight_vehicle_od(origin_zone_id);

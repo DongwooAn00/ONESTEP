@@ -11,8 +11,10 @@ CONTAINER_CSV_DIR = Path("/workspace/data/processed/csv")
 
 TABLES = [
     ("zones", "zones.csv"),
+    ("admin_dongs", "admin_dongs.csv"),
     ("freight_item_codes", "freight_item_codes.csv"),
     ("od_by_mode", "od_by_mode.csv"),
+    ("admin_dong_od_by_mode", "synthetic_admin_dong_od_by_mode.csv"),
     ("od_by_purpose", "od_by_purpose.csv"),
     ("freight_vehicle_od", "freight_vehicle_od.csv"),
     ("freight_tonnage_od", "freight_tonnage_od.csv"),
@@ -73,7 +75,7 @@ def assert_csv_files_exist() -> None:
     if missing_files:
         joined_files = ", ".join(missing_files)
         raise FileNotFoundError(
-            f"CSV 파일이 없습니다: {joined_files}. 먼저 `python3 scripts/preprocess_csv.py`를 실행하세요."
+            f"CSV 파일이 없습니다: {joined_files}. processed CSV를 배치하거나 전처리 스크립트를 먼저 실행하세요."
         )
 
 
@@ -87,8 +89,10 @@ def main() -> None:
             freight_tonnage_od,
             freight_vehicle_od,
             od_by_purpose,
+            admin_dong_od_by_mode,
             od_by_mode,
             freight_item_codes,
+            admin_dongs,
             zones
         RESTART IDENTITY CASCADE;
         """
