@@ -48,6 +48,7 @@ docker compose up -d
 python3 scripts/load_postgis.py
 python3 scripts/load_road_network.py
 python3 scripts/load_dem.py
+python3 scripts/load_admin_dong_od.py
 python3 scripts/load_geology.py
 ```
 ## 기존 방식
