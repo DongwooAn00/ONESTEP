@@ -480,6 +480,41 @@ button {
   height: 100%;
 }
 
+.map-distance-badge {
+  position: absolute;
+  top: 58px;
+  left: 18px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid #f2b8ba;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 4px 14px rgba(27, 48, 70, 0.14);
+  color: #52677a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.map-distance-badge strong {
+  color: #d12f34;
+  font-size: 15px;
+}
+
+.map-distance-overlay {
+  padding: 7px 10px;
+  border: 2px solid #e5484d;
+  border-radius: 6px;
+  background: #ffffff;
+  box-shadow: 0 3px 10px rgba(27, 48, 70, 0.2);
+  color: #c9262b;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
 .map-error {
   position: absolute;
   inset: 0;
@@ -1200,6 +1235,11 @@ td span {
     flex-wrap: wrap;
     height: auto;
     padding: 8px 10px;
+  }
+
+  .map-distance-badge {
+    top: 82px;
+    left: 12px;
   }
 
   .map-mode {

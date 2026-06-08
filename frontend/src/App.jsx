@@ -101,6 +101,36 @@ function formatPoint(point) {
   return `${point.lat.toFixed(5)}, ${point.lng.toFixed(5)}`;
 }
 
+function getStraightDistanceMeters(startPoint, endPoint) {
+  if (!startPoint || !endPoint) {
+    return null;
+  }
+
+  const earthRadiusMeters = 6371000;
+  const toRadians = (degrees) => (degrees * Math.PI) / 180;
+  const startLat = toRadians(startPoint.lat);
+  const endLat = toRadians(endPoint.lat);
+  const deltaLat = toRadians(endPoint.lat - startPoint.lat);
+  const deltaLng = toRadians(endPoint.lng - startPoint.lng);
+  const haversine =
+    Math.sin(deltaLat / 2) ** 2 +
+    Math.cos(startLat) * Math.cos(endLat) * Math.sin(deltaLng / 2) ** 2;
+
+  return earthRadiusMeters * 2 * Math.atan2(Math.sqrt(haversine), Math.sqrt(1 - haversine));
+}
+
+function formatDistance(distanceMeters) {
+  if (distanceMeters === null) {
+    return "출발/도착 선택 필요";
+  }
+
+  if (distanceMeters >= 1000) {
+    return `${(distanceMeters / 1000).toFixed(2)} km`;
+  }
+
+  return `${Math.round(distanceMeters).toLocaleString()} m`;
+}
+
 function InputField({ icon, label, value, unit }) {
   return (
     <label className="field">
@@ -203,9 +233,11 @@ function KakaoRouteMap({ startPoint, endPoint, onSelectPoint, onResetPoints }) {
   const mapRef = useRef(null);
   const markersRef = useRef({ start: null, end: null });
   const routeLineRef = useRef(null);
+  const distanceOverlayRef = useRef(null);
   const clickHandlerRef = useRef(null);
   const onSelectPointRef = useRef(onSelectPoint);
   const [loadError, setLoadError] = useState("");
+  const straightDistance = getStraightDistanceMeters(startPoint, endPoint);
 
   useEffect(() => {
     onSelectPointRef.current = onSelectPoint;
@@ -287,6 +319,11 @@ function KakaoRouteMap({ startPoint, endPoint, onSelectPoint, onResetPoints }) {
       routeLineRef.current = null;
     }
 
+    if (distanceOverlayRef.current) {
+      distanceOverlayRef.current.setMap(null);
+      distanceOverlayRef.current = null;
+    }
+
     if (startPoint && endPoint) {
       const path = [
         new kakao.maps.LatLng(startPoint.lat, startPoint.lng),
@@ -296,10 +333,23 @@ function KakaoRouteMap({ startPoint, endPoint, onSelectPoint, onResetPoints }) {
       routeLineRef.current = new kakao.maps.Polyline({
         map,
         path,
-        strokeWeight: 6,
-        strokeColor: "#0878ec",
-        strokeOpacity: 0.9,
+        strokeWeight: 8,
+        strokeColor: "#e5484d",
+        strokeOpacity: 1,
         strokeStyle: "solid"
+      });
+
+      const distanceLabel = document.createElement("div");
+      distanceLabel.className = "map-distance-overlay";
+      distanceLabel.textContent = `직선거리 ${formatDistance(straightDistance)}`;
+      distanceOverlayRef.current = new kakao.maps.CustomOverlay({
+        map,
+        position: new kakao.maps.LatLng(
+          (startPoint.lat + endPoint.lat) / 2,
+          (startPoint.lng + endPoint.lng) / 2
+        ),
+        content: distanceLabel,
+        yAnchor: 1.4
       });
 
       const bounds = new kakao.maps.LatLngBounds();
@@ -313,6 +363,12 @@ function KakaoRouteMap({ startPoint, endPoint, onSelectPoint, onResetPoints }) {
   return (
     <div className="live-map-wrap">
       <div ref={containerRef} className="live-map" />
+      {straightDistance !== null && (
+        <div className="map-distance-badge">
+          <span>직선거리</span>
+          <strong>{formatDistance(straightDistance)}</strong>
+        </div>
+      )}
       {loadError && (
         <div className="map-error">
           <strong>지도를 불러올 수 없습니다.</strong>
@@ -324,6 +380,7 @@ function KakaoRouteMap({ startPoint, endPoint, onSelectPoint, onResetPoints }) {
         <span>지도 위 원하는 위치를 클릭하세요.</span>
         {startPoint && <small>출발: {formatPoint(startPoint)}</small>}
         {endPoint && <small>도착: {formatPoint(endPoint)}</small>}
+        {straightDistance !== null && <small>직선거리: {formatDistance(straightDistance)}</small>}
         <button type="button" onClick={onResetPoints}>
           선택 초기화
         </button>
@@ -342,6 +399,7 @@ function App() {
     start: { query: "", results: [], message: "" },
     end: { query: "", results: [], message: "" }
   });
+  const straightDistance = getStraightDistanceMeters(startPoint, endPoint);
 
   const handleSelectPoint = useCallback((point) => {
     if (selectionStep === "start") {
@@ -558,6 +616,7 @@ function App() {
           />
           <InputField label="물동량 (톤/연)" value="3,500,000" unit="톤/연" icon={<CircleHelp size={16} />} />
           <InputField label="교통량 (대/일)" value="18,500" unit="대/일" icon={<CircleHelp size={16} />} />
+          <InputField label="직선거리" value={formatDistance(straightDistance)} icon={<MapPin size={16} />} />
           <InputField label="분석 범위" value="15 km" icon={<CircleHelp size={16} />} />
 
           <button className="primary-action" type="button" onClick={handleStartAnalysis}>
