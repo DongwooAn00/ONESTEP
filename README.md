@@ -48,6 +48,7 @@ docker compose up -d
 python3 scripts/load_postgis.py
 python3 scripts/load_road_network.py
 python3 scripts/load_dem.py
+python3 scripts/load_geology.py
 ```
 ## 기존 방식
 
@@ -91,6 +92,12 @@ DEM 래스터를 DB에 적재합니다.
 
 ```bash
 python3 scripts/load_dem.py
+```
+
+수치지질도 Shapefile을 DB에 적재합니다.
+
+```bash
+python3 scripts/load_geology.py
 ```
 
 DB를 종료하려면 다음을 실행합니다.

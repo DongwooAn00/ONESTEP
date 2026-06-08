@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   BarChart3,
-  Bell,
   BookOpen,
   ChevronDown,
   CircleHelp,
@@ -11,7 +10,7 @@ import {
   RotateCcw,
   Share2,
   Trophy,
-  UserRound
+  X
 } from "lucide-react";
 
 const KAKAO_MAP_JS_KEY = import.meta.env.VITE_KAKAO_MAP_JS_KEY;
@@ -337,6 +336,8 @@ function App() {
   const [startPoint, setStartPoint] = useState(null);
   const [endPoint, setEndPoint] = useState(null);
   const [selectionStep, setSelectionStep] = useState("start");
+  const [analysisStatus, setAnalysisStatus] = useState("idle");
+  const [showGuide, setShowGuide] = useState(false);
   const [locationSearch, setLocationSearch] = useState({
     start: { query: "", results: [], message: "" },
     end: { query: "", results: [], message: "" }
@@ -367,10 +368,15 @@ function App() {
     setStartPoint(null);
     setEndPoint(null);
     setSelectionStep("start");
+    setAnalysisStatus("idle");
     setLocationSearch({
       start: { query: "", results: [], message: "" },
       end: { query: "", results: [], message: "" }
     });
+  }, []);
+
+  const handleStartAnalysis = useCallback(() => {
+    setAnalysisStatus("success");
   }, []);
 
   const handleLocationQueryChange = useCallback((target, query) => {
@@ -477,23 +483,49 @@ function App() {
           <p>도로 · 터널 후보지 경제성 분석 서비스</p>
         </div>
         <nav className="top-actions" aria-label="상단 메뉴">
-          <button type="button">
+          <button type="button" onClick={() => setShowGuide(true)}>
             <BookOpen size={18} />
             사용 가이드
-          </button>
-          <button className="icon-button" type="button" aria-label="알림">
-            <Bell size={19} />
-            <span>3</span>
-          </button>
-          <button type="button">
-            <UserRound size={18} />
-            홍길동
-            <ChevronDown size={15} />
           </button>
         </nav>
       </header>
 
-      <section className="dashboard">
+      {showGuide && (
+        <div className="guide-overlay" role="dialog" aria-modal="true" aria-labelledby="guide-title">
+          <section className="guide-panel">
+            <div className="guide-head">
+              <div>
+                <BookOpen size={20} />
+                <h2 id="guide-title">사용 가이드</h2>
+              </div>
+              <button className="guide-close" type="button" aria-label="가이드 닫기" onClick={() => setShowGuide(false)}>
+                <X size={18} />
+              </button>
+            </div>
+
+            <ol className="guide-steps">
+              <li>
+                <strong>출발지 선택</strong>
+                <span>검색창을 사용하거나 지도 위 위치를 클릭해 출발지를 지정합니다.</span>
+              </li>
+              <li>
+                <strong>도착지 선택</strong>
+                <span>도착지를 선택하면 지도에 선택 경로가 표시됩니다.</span>
+              </li>
+              <li>
+                <strong>조건 확인</strong>
+                <span>물동량, 교통량, 분석 범위를 확인한 뒤 필요 조건을 조정합니다.</span>
+              </li>
+              <li>
+                <strong>후보 분석 시작</strong>
+                <span>분석 버튼을 누르면 후보별 비교와 추천 결과가 표시됩니다.</span>
+              </li>
+            </ol>
+          </section>
+        </div>
+      )}
+
+      <section className={`dashboard ${analysisStatus === "idle" ? "dashboard-idle" : "dashboard-analyzed"}`}>
         <aside className="input-panel">
           <h2>
             <BarChart3 size={18} />
@@ -528,11 +560,11 @@ function App() {
           <InputField label="교통량 (대/일)" value="18,500" unit="대/일" icon={<CircleHelp size={16} />} />
           <InputField label="분석 범위" value="15 km" icon={<CircleHelp size={16} />} />
 
-          <button className="primary-action" type="button">
+          <button className="primary-action" type="button" onClick={handleStartAnalysis}>
             <Play size={18} fill="currentColor" />
             후보 분석 시작
           </button>
-          <button className="secondary-action" type="button">
+          <button className="secondary-action" type="button" onClick={handleResetPoints}>
             <RotateCcw size={17} />
             초기화
           </button>
@@ -558,90 +590,104 @@ function App() {
             />
           </section>
 
-          <section className="comparison">
-            <article className="chart-card">
-              <h3>후보별 비교 분석</h3>
-              <div className="bar-list">
-                {candidates.map((candidate) => (
-                  <div className="bar-row" key={candidate.id}>
-                    <span>{candidate.name} ({candidate.type.includes("터널") ? "터널" : "도로"})</span>
-                    <div>
-                      <i style={{ width: `${candidate.score}%`, backgroundColor: candidate.color }}></i>
+          {analysisStatus === "success" && (
+            <section className="comparison">
+              <article className="chart-card">
+                <h3>후보별 비교 분석</h3>
+                <div className="bar-list">
+                  {candidates.map((candidate) => (
+                    <div className="bar-row" key={candidate.id}>
+                      <span>{candidate.name} ({candidate.type.includes("터널") ? "터널" : "도로"})</span>
+                      <div>
+                        <i style={{ width: `${candidate.score}%`, backgroundColor: candidate.color }}></i>
+                      </div>
+                      <strong>{candidate.score}</strong>
                     </div>
-                    <strong>{candidate.score}</strong>
-                  </div>
-                ))}
-              </div>
-              <div className="axis">
-                <span>0</span>
-                <span>20</span>
-                <span>40</span>
-                <span>60</span>
-                <span>80</span>
-                <span>100</span>
-              </div>
-            </article>
-
-            <article className="table-card">
-              <table>
-                <thead>
-                  <tr>
-                    <th></th>
-                    <th>총 편익<br />(억원)</th>
-                    <th>총 비용<br />(억원)</th>
-                    <th>B/C<br />편익/비용</th>
-                    <th>순현재가치<br />NPV, 억원</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comparisonRows.map((row, index) => (
-                    <tr key={row[0]}>
-                      <td>
-                        <span style={{ backgroundColor: candidates[index].color }}></span>
-                      </td>
-                      {row.slice(1).map((cell) => (
-                        <td key={cell}>{cell}</td>
-                      ))}
-                    </tr>
                   ))}
-                </tbody>
-              </table>
-            </article>
-          </section>
+                </div>
+                <div className="axis">
+                  <span>0</span>
+                  <span>20</span>
+                  <span>40</span>
+                  <span>60</span>
+                  <span>80</span>
+                  <span>100</span>
+                </div>
+              </article>
+
+              <article className="table-card">
+                <table>
+                  <thead>
+                    <tr>
+                      <th></th>
+                      <th>총 편익<br />(억원)</th>
+                      <th>총 비용<br />(억원)</th>
+                      <th>B/C<br />편익/비용</th>
+                      <th>순현재가치<br />NPV, 억원</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {comparisonRows.map((row, index) => (
+                      <tr key={row[0]}>
+                        <td>
+                          <span style={{ backgroundColor: candidates[index].color }}></span>
+                        </td>
+                        {row.slice(1).map((cell) => (
+                          <td key={cell}>{cell}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </article>
+            </section>
+          )}
         </section>
 
         <aside className="result-panel">
-          <div className="panel-title">
-            <h2>
-              <BarChart3 size={19} />
-              분석 결과
-            </h2>
-            <button type="button">상세 비교 보기</button>
-          </div>
+          {analysisStatus === "idle" ? (
+            <div className="result-empty">
+              <span>
+                <BarChart3 size={20} />
+              </span>
+              <h2>분석 후 표시됩니다</h2>
+              <p>출발지와 도착지를 정한 뒤 후보 분석을 시작하면 비교 결과와 추천안이 이 영역에 나타납니다.</p>
+            </div>
+          ) : (
+            <>
+              <div className="panel-title">
+                <h2>
+                  <BarChart3 size={19} />
+                  분석 결과
+                </h2>
+                <button type="button">상세 비교 보기</button>
+              </div>
 
-          {candidates.map((candidate, index) => (
-            <CandidateCard candidate={candidate} active={index === 0} key={candidate.id} />
-          ))}
+              {candidates.map((candidate, index) => (
+                <CandidateCard candidate={candidate} active={index === 0} key={candidate.id} />
+              ))}
 
-          <div className="score-note">
-            <CircleHelp size={17} />
-            경제성 점수 = 편익(B/C) 기반 종합 점수 (100점 만점)
-          </div>
+              <div className="score-note">
+                <CircleHelp size={17} />
+                경제성 점수 = 편익(B/C) 기반 종합 점수 (100점 만점)
+              </div>
 
-          <article className="ai-summary">
-            <h3>AI 종합 의견</h3>
-            <p>
-              <strong>후보 1(도로)</strong>이 경제성, 시간 단축, 공사비 측면에서 가장 균형 잡힌 최적 대안으로 분석되었습니다.
-            </p>
-            <button className="primary-action" type="button">
-              <Download size={18} />
-              리포트 다운로드
-            </button>
-            <button className="secondary-action" type="button">
-              <Share2 size={17} />
-              분석 결과 공유
-            </button>
-          </article>
+              <article className="ai-summary">
+                <h3>AI 종합 의견</h3>
+                <p>
+                  <strong>후보 1(도로)</strong>이 경제성, 시간 단축, 공사비 측면에서 가장 균형 잡힌 최적 대안으로 분석되었습니다.
+                </p>
+                <button className="primary-action" type="button">
+                  <Download size={18} />
+                  리포트 다운로드
+                </button>
+                <button className="secondary-action" type="button">
+                  <Share2 size={17} />
+                  분석 결과 공유
+                </button>
+              </article>
+            </>
+          )}
         </aside>
       </section>
     </main>
