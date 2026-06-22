@@ -1,0 +1,66 @@
+ROAD_UNIT_COST_EOK_PER_KM = 184.0
+TUNNEL_NATM_2LANE_THOUSAND_KRW_PER_M = 13940.0
+TUNNEL_NATM_3LANE_THOUSAND_KRW_PER_M = 22959.0
+BRIDGE_UNIT_COST_EOK_PER_KM = 601.0
+
+ROAD_CONTINGENCY = 0.25
+TUNNEL_CONTINGENCY = 0.35
+BRIDGE_CONTINGENCY = 0.30
+
+DEFAULT_GROUND_FACTOR = 1.30
+DEFAULT_TUNNEL_AUX_FACTOR = 1.05
+DEFAULT_TUNNEL_AREA_FACTOR = 1.00
+
+DEFAULT_GRID_CELL_SIZE_M = 500.0
+MAX_GRID_CELLS = 3600
+DEFAULT_ROUTE_LIMIT = 20
+MIN_ROUTE_LIMIT = 1
+MAX_ROUTE_LIMIT = 50
+
+SLOPE_COST_BREAKS = (
+    (5.0, 1.0),
+    (10.0, 1.5),
+    (15.0, 2.5),
+    (25.0, 5.0),
+    (float("inf"), 12.0),
+)
+
+RIVER_MULTIPLIERS = {
+    "small": 5.0,
+    "minor": 5.0,
+    "local": 5.0,
+    "normal": 10.0,
+    "river": 10.0,
+    "large": 30.0,
+    "national": 30.0,
+    "major": 30.0,
+}
+
+BRIDGE_MIN_LENGTH_KM = {
+    "small": 0.1,
+    "minor": 0.1,
+    "local": 0.1,
+    "normal": 0.2,
+    "river": 0.2,
+    "large": 0.3,
+    "national": 0.3,
+    "major": 0.3,
+    "unknown": 0.2,
+}
+
+HIGHWAY_ROAD_MULTIPLIER = 0.6
+LOCAL_ROAD_MULTIPLIER = 0.8
+ROAD_ACCESS_BUFFER_M = 300.0
+
+URBAN_COST_MULTIPLIERS = {
+    "rural": 1.00,
+    "semi_urban": 1.10,
+    "urban": 1.20,
+}
+
+SPEED_COST_MULTIPLIERS = {
+    80: 1.00,
+    100: 1.05,
+}
+
+DETOUR_FACTOR_ASSUMPTION = 1.3

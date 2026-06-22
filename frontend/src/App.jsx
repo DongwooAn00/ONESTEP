@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  AlertCircle,
   BarChart3,
   Bell,
   BookOpen,
   Building2,
+  Download,
   FileUp,
   Heart,
   ListPlus,
@@ -11,6 +13,7 @@ import {
   Megaphone,
   MessageSquareText,
   MousePointer2,
+  Network,
   Play,
   Plus,
   RotateCcw,
@@ -21,6 +24,7 @@ import {
 } from "lucide-react";
 
 const KAKAO_MAP_JS_KEY = import.meta.env.VITE_KAKAO_MAP_JS_KEY;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const DEFAULT_CENTER = { lat: 36.35, lng: 127.85 };
 const DEFAULT_MAP_LEVEL = 13;
 
@@ -155,6 +159,21 @@ function formatNumber(value) {
   return Number.isFinite(number) ? number.toLocaleString() : "0";
 }
 
+function formatMoneyEok(value) {
+  const number = Number(value || 0);
+  return Number.isFinite(number) ? `${number.toLocaleString(undefined, { maximumFractionDigits: 1 })} 억원` : "0 억원";
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
 function formatPoint(point) {
   if (!point) {
     return "선택 안 됨";
@@ -264,7 +283,16 @@ function getScenarioTotals(scenario) {
   );
 }
 
-function RouteMap({ routes, draftRoute, onSelectPoint, helperText, compact = false }) {
+function RouteMap({
+  routes,
+  draftRoute,
+  onSelectPoint,
+  helperText,
+  compact = false,
+  candidateNodes = [],
+  candidateEdges = [],
+  candidateRouteSegments = []
+}) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
   const clickHandlerRef = useRef(null);
@@ -397,13 +425,107 @@ function RouteMap({ routes, draftRoute, onSelectPoint, helperText, compact = fal
       }
     });
 
+    const nodeById = new Map(candidateNodes.map((node) => [node.node_id, node]));
+
+    candidateRouteSegments.forEach((segment) => {
+      const coordinates = segment.segment_geometry || [];
+      if (coordinates.length < 2) {
+        return;
+      }
+
+      const segmentStyle = {
+        surface_road: { color: "#0b7ff3", weight: 5, opacity: 0.82, style: "solid" },
+        tunnel: { color: "#7f57d9", weight: 6, opacity: 0.9, style: "shortdash" },
+        bridge: { color: "#14a8b5", weight: 6, opacity: 0.9, style: "dash" }
+      }[segment.segment_type] || { color: "#0b7ff3", weight: 5, opacity: 0.82, style: "solid" };
+
+      const path = coordinates.map((point) => new kakao.maps.LatLng(point.lat, point.lon));
+      path.forEach((point) => {
+        bounds.extend(point);
+        hasBounds = true;
+      });
+
+      const line = new kakao.maps.Polyline({
+        map,
+        path,
+        strokeWeight: segmentStyle.weight,
+        strokeColor: segmentStyle.color,
+        strokeOpacity: segmentStyle.opacity,
+        strokeStyle: segmentStyle.style
+      });
+      linesRef.current.push(line);
+    });
+
+    if (!candidateRouteSegments.length) {
+      const maxEdgeFlow = Math.max(...candidateEdges.map((edge) => Number(edge.estimated_flow) || 0), 1);
+      candidateEdges.forEach((edge) => {
+        const fromNode = nodeById.get(edge.from_node_id);
+        const toNode = nodeById.get(edge.to_node_id);
+        if (!fromNode || !toNode) {
+          return;
+        }
+
+        const path = [
+          new kakao.maps.LatLng(fromNode.latitude, fromNode.longitude),
+          new kakao.maps.LatLng(toNode.latitude, toNode.longitude)
+        ];
+        const line = new kakao.maps.Polyline({
+          map,
+          path,
+          strokeWeight: Math.max(3, Math.min(11, 3 + ((Number(edge.estimated_flow) || 0) / maxEdgeFlow) * 8)),
+          strokeColor: "#e5484d",
+          strokeOpacity: edge.rank <= 5 ? 0.92 : 0.62,
+          strokeStyle: "solid"
+        });
+        linesRef.current.push(line);
+
+        const label = document.createElement("div");
+        label.className = "map-distance-overlay candidate-edge-label";
+        label.textContent = `#${edge.rank} ${edge.straight_distance_km.toFixed(1)} km / ${formatNumber(edge.estimated_flow)}`;
+        const overlay = new kakao.maps.CustomOverlay({
+          map,
+          position: new kakao.maps.LatLng(
+            (fromNode.latitude + toNode.latitude) / 2,
+            (fromNode.longitude + toNode.longitude) / 2
+          ),
+          content: label,
+          yAnchor: 1.4
+        });
+        overlaysRef.current.push(overlay);
+      });
+    }
+
+    candidateNodes.forEach((node) => {
+      const position = new kakao.maps.LatLng(node.latitude, node.longitude);
+      bounds.extend(position);
+      hasBounds = true;
+
+      const marker = new kakao.maps.Marker({
+        map,
+        position,
+        title: `${node.node_id} flow ${formatNumber(node.cluster_total_flow)}`
+      });
+      markersRef.current.push(marker);
+
+      const label = document.createElement("div");
+      label.className = "candidate-node-overlay";
+      label.textContent = node.node_id;
+      const overlay = new kakao.maps.CustomOverlay({
+        map,
+        position,
+        content: label,
+        yAnchor: 2.2
+      });
+      overlaysRef.current.push(overlay);
+    });
+
     window.setTimeout(() => {
       map.relayout();
       if (hasBounds) {
         map.setBounds(bounds);
       }
     }, 80);
-  }, [routes, draftRoute]);
+  }, [routes, draftRoute, candidateNodes, candidateEdges, candidateRouteSegments]);
 
   return (
     <div className={`live-map-wrap ${compact ? "compact-map" : ""}`}>
@@ -1235,6 +1357,449 @@ function PostList({ posts, onLikePost }) {
   );
 }
 
+function AnalysisMvpPage() {
+  const [analysisStatus, setAnalysisStatus] = useState("idle");
+  const [routeStatus, setRouteStatus] = useState("idle");
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [candidateResult, setCandidateResult] = useState(null);
+  const [candidateRouteResult, setCandidateRouteResult] = useState(null);
+  const [routeLimit, setRouteLimit] = useState(20);
+  const [flowFilterPercent, setFlowFilterPercent] = useState("");
+  const [lowImpactPrunePercent, setLowImpactPrunePercent] = useState("20");
+  const [edgeLimit, setEdgeLimit] = useState(50);
+  const [sampleSize, setSampleSize] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [routeErrorMessage, setRouteErrorMessage] = useState("");
+
+  const runCandidateGeneration = async () => {
+    setAnalysisStatus("loading");
+    setRouteStatus("idle");
+    setErrorMessage("");
+    setRouteErrorMessage("");
+    setCandidateResult(null);
+    setCandidateRouteResult(null);
+
+    const formData = new FormData();
+    formData.append("top_node_limit", "100");
+    formData.append("edge_limit", String(edgeLimit));
+    if (flowFilterPercent) {
+      formData.append("flow_filter_percent", flowFilterPercent);
+    }
+    if (lowImpactPrunePercent !== "") {
+      formData.append("low_impact_prune_percent", lowImpactPrunePercent);
+    }
+    if (sampleSize) {
+      formData.append("sample_size", sampleSize);
+    }
+    if (uploadedFile) {
+      formData.append("file", uploadedFile);
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/od-candidates`, {
+        method: "POST",
+        body: formData
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.detail || "OD 후보 생성에 실패했습니다.");
+      }
+      setCandidateResult(payload);
+      setAnalysisStatus("success");
+    } catch (error) {
+      setErrorMessage(error.message);
+      setAnalysisStatus("error");
+    }
+  };
+
+  const runCandidateRouteAnalysis = async () => {
+    if (!candidateResult?.nodes?.length || !candidateResult?.edges?.length) {
+      setRouteErrorMessage("먼저 OD 기반 후보 연결쌍을 생성해주세요.");
+      setRouteStatus("error");
+      return;
+    }
+
+    setRouteStatus("loading");
+    setRouteErrorMessage("");
+    setCandidateRouteResult(null);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/candidate-routes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nodes: candidateResult.nodes,
+          edges: candidateResult.edges,
+          route_limit: routeLimit
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.detail || "MVP 예비 후보 노선 산정에 실패했습니다.");
+      }
+      setCandidateRouteResult(payload);
+      setRouteStatus("success");
+    } catch (error) {
+      setRouteErrorMessage(error.message);
+      setRouteStatus("error");
+    }
+  };
+
+  const nodes = candidateResult?.nodes || [];
+  const edges = candidateResult?.edges || [];
+  const stats = candidateResult?.stats;
+  const routeSegments = candidateRouteResult?.segments || [];
+  const rankedRoutes = candidateRouteResult?.ranked_routes || [];
+  const routeCosts = candidateRouteResult?.costs || [];
+  const costByRouteId = new Map(routeCosts.map((cost) => [cost.route_id, cost]));
+
+  return (
+    <section className={`dashboard od-mvp-dashboard ${analysisStatus === "success" ? "dashboard-analyzed" : "dashboard-idle"}`}>
+      <aside className="input-panel scenario-panel">
+        <h2>
+          <Network size={18} />
+          OD 후보 생성 MVP
+        </h2>
+
+        <label className="file-drop">
+          <FileUp size={19} />
+          <span>CSV 파일 선택</span>
+          <small>{uploadedFile ? uploadedFile.name : "미선택 시 프로젝트 기본 CSV를 사용합니다."}</small>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={(event) => setUploadedFile(event.target.files?.[0] || null)}
+          />
+        </label>
+
+        <div className="analysis-rule-list">
+          <span>전체 OD 기본 사용</span>
+          <span>K=10, 20, 30, 50 반복</span>
+          <span>3km 이내 후보 정점 병합</span>
+          <span>하위 20% 영향 정점 제거</span>
+        </div>
+
+        <div className="analysis-options candidate-options">
+          <label className="plain-field">
+            <span>OD 필터</span>
+            <select value={flowFilterPercent} onChange={(event) => setFlowFilterPercent(event.target.value)}>
+              <option value="">전체 OD</option>
+              <option value="5">상위 5%</option>
+              <option value="10">상위 10%</option>
+              <option value="20">상위 20%</option>
+            </select>
+          </label>
+          <label className="plain-field">
+            <span>하위 정점 제거</span>
+            <select value={lowImpactPrunePercent} onChange={(event) => setLowImpactPrunePercent(event.target.value)}>
+              <option value="20">하위 20%</option>
+              <option value="30">하위 30%</option>
+              <option value="">제거 없음</option>
+            </select>
+          </label>
+          <label className="plain-field">
+            <span>후보 연결쌍</span>
+            <select value={edgeLimit} onChange={(event) => setEdgeLimit(Number(event.target.value))}>
+              <option value={20}>상위 20개</option>
+              <option value={50}>상위 50개</option>
+              <option value={100}>상위 100개</option>
+            </select>
+          </label>
+          <label className="plain-field">
+            <span>샘플링</span>
+            <select value={sampleSize} onChange={(event) => setSampleSize(event.target.value)}>
+              <option value="">사용 안 함</option>
+              <option value="5000">5,000행</option>
+              <option value="20000">20,000행</option>
+              <option value="50000">50,000행</option>
+            </select>
+          </label>
+        </div>
+
+        <button className="primary-action" type="button" onClick={runCandidateGeneration} disabled={analysisStatus === "loading"}>
+          <Play size={18} fill="currentColor" />
+          {analysisStatus === "loading" ? "후보 생성 중" : "후보 생성 실행"}
+        </button>
+
+        <p className="status-text">
+          전체 OD의 total_flow를 sample_weight로 사용해 후보 정점을 만들고, 전체 OD 기반 estimated_flow로 초기 후보 연결쌍을 정렬합니다.
+        </p>
+
+        <div className="analysis-options">
+          <label className="plain-field">
+            <span>노선 탐색 후보 수</span>
+            <select value={routeLimit} onChange={(event) => setRouteLimit(Number(event.target.value))}>
+              <option value={10}>상위 10개</option>
+              <option value={20}>상위 20개</option>
+              <option value={50}>상위 50개</option>
+            </select>
+          </label>
+          <button
+            className="secondary-action"
+            type="button"
+            onClick={runCandidateRouteAnalysis}
+            disabled={analysisStatus !== "success" || routeStatus === "loading"}
+          >
+            <Play size={18} fill="currentColor" />
+            {routeStatus === "loading" ? "예비 노선 산정 중" : "MVP 예비 후보 노선 산정"}
+          </button>
+          {routeErrorMessage && <p className="status-text error-copy">{routeErrorMessage}</p>}
+        </div>
+      </aside>
+
+      <section className="main-panel">
+        <section className="map-card" aria-label="OD 기반 후보 정점과 후보 연결쌍 지도">
+          <div className="map-toolbar">
+            <span className="legend candidate" />
+            전체 OD 가중치 기반 후보 정점
+            <span className="legend tunnel" />
+            터널
+            <span className="legend bridge" />
+            교량
+          </div>
+          <RouteMap
+            routes={[]}
+            candidateNodes={nodes}
+            candidateEdges={edges}
+            candidateRouteSegments={routeSegments}
+            helperText={{
+              title: stats?.source_name || "OD CSV를 선택하세요",
+              body: edges.length
+                ? "이 결과는 실제 도로 노선이 아니라 DEM·하천·기존도로망 기반 경로 탐색 전의 수요 기반 초기 후보 연결쌍입니다."
+                : "기본 CSV 또는 업로드 CSV로 후보 생성을 실행하세요."
+            }}
+          />
+        </section>
+
+        <section className="scenario-detail-band">
+          <div>
+            <h2>OD 기반 신규 도로·터널 후보 생성</h2>
+            <p>
+              {stats
+                ? `${formatNumber(stats.total_od_rows)}개 OD 중 ${
+                    stats.selected_top_percent ? `상위 ${stats.selected_top_percent}% ` : "전체 "
+                  }${formatNumber(stats.selected_top_rows)}개 흐름 분석`
+                : "수단별 통행량을 가중 합산한 total_flow로 전체 OD 기반 후보를 생성합니다."}
+            </p>
+          </div>
+          {candidateResult && (
+            <div className="download-actions">
+              <button type="button" onClick={() => downloadJson("candidate_nodes.json", nodes)}>
+                <Download size={17} />
+                nodes JSON
+              </button>
+              <button type="button" onClick={() => downloadJson("candidate_edges.json", edges)}>
+                <Download size={17} />
+                edges JSON
+              </button>
+              {candidateRouteResult && (
+                <>
+                  <button type="button" onClick={() => downloadJson("candidate_routes.json", candidateRouteResult.routes)}>
+                    <Download size={17} />
+                    routes JSON
+                  </button>
+                  <button type="button" onClick={() => downloadJson("candidate_route_segments.json", candidateRouteResult.segments)}>
+                    <Download size={17} />
+                    segments JSON
+                  </button>
+                  <button type="button" onClick={() => downloadJson("candidate_route_costs.json", candidateRouteResult.costs)}>
+                    <Download size={17} />
+                    costs JSON
+                  </button>
+                  <button type="button" onClick={() => downloadJson("ranked_candidate_routes.json", candidateRouteResult.ranked_routes)}>
+                    <Download size={17} />
+                    ranked JSON
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </section>
+
+        {candidateRouteResult && (
+          <section className="od-table-card">
+            <div className="section-head">
+              <h3>MVP 예비 후보 노선 산정 결과</h3>
+              <span>{formatNumber(rankedRoutes.length)}개 후보</span>
+            </div>
+            <div className="stats-grid">
+              <span>
+                성공
+                <strong>{formatNumber(candidateRouteResult.routes.filter((route) => route.status === "success").length)}</strong>
+              </span>
+              <span>
+                실패
+                <strong>{formatNumber(candidateRouteResult.routes.filter((route) => route.status === "failed").length)}</strong>
+              </span>
+              <span>
+                터널 구간
+                <strong>{formatNumber(routeSegments.filter((segment) => segment.segment_type === "tunnel").length)}</strong>
+              </span>
+              <span>
+                교량 구간
+                <strong>{formatNumber(routeSegments.filter((segment) => segment.segment_type === "bridge").length)}</strong>
+              </span>
+            </div>
+            {candidateRouteResult.warnings.map((warning) => (
+              <p className="status-text" key={warning}>{warning}</p>
+            ))}
+          </section>
+        )}
+
+        {stats && (
+          <section className="od-table-card">
+            <div className="section-head">
+              <h3>처리 로그</h3>
+              <span>좌표 제외 {formatNumber(stats.coordinate_excluded_rows)}개</span>
+            </div>
+            <div className="stats-grid">
+              <span>
+                신규 정점
+                <strong>{formatNumber(nodes.length)}</strong>
+              </span>
+              <span>
+                후보 연결쌍
+                <strong>{formatNumber(edges.length)}</strong>
+              </span>
+              <span>
+                클러스터링 OD
+                <strong>{formatNumber(stats.clustered_od_rows)}</strong>
+              </span>
+              <span>
+                사용 클러스터
+                <strong>{stats.cluster_count_used}/{stats.cluster_count_requested}</strong>
+              </span>
+            </div>
+            <div className="stats-grid iterative-stats">
+              <span>
+                원시 중심점
+                <strong>{formatNumber(stats.pre_merge_node_count)}</strong>
+              </span>
+              <span>
+                3km 병합 후
+                <strong>{formatNumber(stats.merged_node_count)}</strong>
+              </span>
+              <span>
+                반복 K
+                <strong>{stats.iterative_cluster_counts?.join(", ")}</strong>
+              </span>
+              <span>
+                유지 상한
+                <strong>{formatNumber(stats.top_node_limit)}</strong>
+              </span>
+            </div>
+            <div className="stats-grid iterative-stats">
+              <span>
+                제거 정점
+                <strong>{formatNumber(stats.pruned_node_count)}</strong>
+              </span>
+              <span>
+                edge 상위 제한
+                <strong>{formatNumber(stats.edge_limit)}</strong>
+              </span>
+              <span>
+                0 이하 flow 제외
+                <strong>{formatNumber(stats.non_positive_flow_excluded_rows)}</strong>
+              </span>
+              <span>
+                정점 제거율
+                <strong>{stats.low_impact_prune_percent === null ? "없음" : `${stats.low_impact_prune_percent}%`}</strong>
+              </span>
+            </div>
+            <p className="status-text">
+              실제 도로·터널 후보 노선은 다음 단계에서 비용지도와 최저비용 경로 탐색을 통해 산정됩니다.
+            </p>
+            {stats.warnings.map((warning) => (
+              <p className="status-text" key={warning}>{warning}</p>
+            ))}
+          </section>
+        )}
+      </section>
+
+      <aside className="result-panel">
+        {analysisStatus === "idle" && (
+          <div className="result-empty">
+            <span>
+              <BarChart3 size={20} />
+            </span>
+            <h2>분석 전 상태</h2>
+            <p>전체 OD 기반 분석을 실행하려면 기본 CSV에 대응하는 행정동 좌표 lookup 또는 좌표 포함 업로드 CSV가 필요합니다.</p>
+          </div>
+        )}
+
+        {analysisStatus === "loading" && (
+          <div className="result-empty">
+            <span>
+              <Network size={20} />
+            </span>
+            <h2>후보 생성 중</h2>
+            <p>전체 OD를 출발·도착 weighted point로 변환하고 sample_weight 기반 K-Means로 수요 중심 정점을 계산하고 있습니다.</p>
+          </div>
+        )}
+
+        {analysisStatus === "error" && (
+          <div className="result-empty error-state">
+            <span>
+              <AlertCircle size={20} />
+            </span>
+            <h2>후보 생성 불가</h2>
+            <p>{errorMessage}</p>
+          </div>
+        )}
+
+        {analysisStatus === "success" && (
+          <>
+            <div className="panel-title">
+              <h2>
+                <MapPin size={19} />
+                {candidateRouteResult ? "후보 노선 순위" : "후보 연결쌍"}
+              </h2>
+              <span>{candidateRouteResult ? `${formatNumber(rankedRoutes.length)}개` : `${formatNumber(edges.length)}개`}</span>
+            </div>
+            <div className="edge-list">
+              {candidateRouteResult ? rankedRoutes.map((route) => {
+                const cost = costByRouteId.get(route.route_id);
+                return (
+                  <article className="edge-card ranked-route-card" key={route.route_id}>
+                    <header>
+                      <strong>#{route.rank} {route.from_node_id} → {route.to_node_id}</strong>
+                      <small>{route.summary.status}</small>
+                    </header>
+                    <div>
+                      <span>총 노선 길이 <strong>{route.summary.route_length_km.toFixed(2)} km</strong></span>
+                      <span>예상 수요 <strong>{formatNumber(route.estimated_flow)}</strong></span>
+                      <span>지상도로 <strong>{route.summary.surface_road_length_km.toFixed(2)} km</strong></span>
+                      <span>터널 <strong>{route.summary.tunnel_length_km.toFixed(2)} km</strong></span>
+                      <span>교량 <strong>{route.summary.bridge_length_km.toFixed(2)} km</strong></span>
+                      <span>직접공사비 <strong>{formatMoneyEok(cost?.total_direct_cost)}</strong></span>
+                      <span>예비율 포함 공사비 <strong>{formatMoneyEok(route.total_screen_cost)}</strong></span>
+                      <span>MVP 예비 경제성 점수 <strong>{route.economic_score.toFixed(1)}</strong></span>
+                    </div>
+                    {route.summary.failed_reason && <p className="status-text error-copy">{route.summary.failed_reason}</p>}
+                  </article>
+                );
+              }) : edges.map((edge) => (
+                <article className="edge-card" key={edge.edge_id}>
+                  <header>
+                    <strong>#{edge.rank} {edge.from_node_id} → {edge.to_node_id}</strong>
+                    <small>{edge.edge_id}</small>
+                  </header>
+                  <div>
+                    <span>거리 <strong>{edge.straight_distance_km.toFixed(2)} km</strong></span>
+                    <span>추정 수요 <strong>{formatNumber(edge.estimated_flow)}</strong></span>
+                    <span>집계 OD <strong>{formatNumber(edge.od_count)}</strong></span>
+                    <span>기준 <strong>전체 OD</strong></span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </>
+        )}
+      </aside>
+    </section>
+  );
+}
+
 function App() {
   const [activePage, setActivePage] = useState("analysis");
   const [showGuide, setShowGuide] = useState(false);
@@ -1273,14 +1838,7 @@ function App() {
       {showGuide && <GuideDialog onClose={() => setShowGuide(false)} />}
 
       {activePage === "analysis" && (
-        <AnalysisPage
-          scenarios={scenarios}
-          selectedScenario={selectedScenario}
-          selectedScenarioId={selectedScenarioId}
-          onSelectScenario={setSelectedScenarioId}
-          onImportScenario={addScenario}
-          onGoCreate={() => setActivePage("create")}
-        />
+        <AnalysisMvpPage />
       )}
 
       {activePage === "create" && <ScenarioCreatePage onSaveScenario={handleSaveScenario} />}

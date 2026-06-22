@@ -1,0 +1,40 @@
+[
+  {
+    "rank": 1,
+    "route_id": "R001",
+    "from_node_id": "N001",
+    "to_node_id": "N002",
+    "estimated_flow": 29000.0,
+    "distance_saving_km": 4.758,
+    "total_screen_cost": 4719.83,
+    "economic_score": 50.0,
+    "summary": {
+      "label": "MVP 예비 경제성 점수",
+      "status": "success",
+      "route_length_km": 20.521,
+      "surface_road_length_km": 20.521,
+      "tunnel_length_km": 0,
+      "bridge_length_km": 0,
+      "failed_reason": null
+    }
+  },
+  {
+    "rank": 2,
+    "route_id": "R002",
+    "from_node_id": "N003",
+    "to_node_id": "N004",
+    "estimated_flow": 23700.0,
+    "distance_saving_km": 2.358,
+    "total_screen_cost": 4470.05,
+    "economic_score": 50.0,
+    "summary": {
+      "label": "MVP 예비 경제성 점수",
+      "status": "success",
+      "route_length_km": 19.435,
+      "surface_road_length_km": 19.435,
+      "tunnel_length_km": 0,
+      "bridge_length_km": 0,
+      "failed_reason": null
+    }
+  }
+]

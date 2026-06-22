@@ -1,0 +1,92 @@
+[
+  {
+    "edge_id": "E001",
+    "from_node_id": "N001",
+    "to_node_id": "N006",
+    "straight_distance_km": 19.417,
+    "estimated_flow": 28700.0,
+    "rank": 1,
+    "od_count": 1,
+    "source": "all_od_weighted_kmeans"
+  },
+  {
+    "edge_id": "E002",
+    "from_node_id": "N002",
+    "to_node_id": "N005",
+    "straight_distance_km": 16.742,
+    "estimated_flow": 23440.0,
+    "rank": 2,
+    "od_count": 1,
+    "source": "all_od_weighted_kmeans"
+  },
+  {
+    "edge_id": "E003",
+    "from_node_id": "N008",
+    "to_node_id": "N009",
+    "straight_distance_km": 45.327,
+    "estimated_flow": 22760.0,
+    "rank": 3,
+    "od_count": 1,
+    "source": "all_od_weighted_kmeans"
+  },
+  {
+    "edge_id": "E004",
+    "from_node_id": "N010",
+    "to_node_id": "N011",
+    "straight_distance_km": 23.301,
+    "estimated_flow": 22240.0,
+    "rank": 4,
+    "od_count": 1,
+    "source": "all_od_weighted_kmeans"
+  },
+  {
+    "edge_id": "E005",
+    "from_node_id": "N007",
+    "to_node_id": "N012",
+    "straight_distance_km": 38.585,
+    "estimated_flow": 14860.0,
+    "rank": 5,
+    "od_count": 1,
+    "source": "all_od_weighted_kmeans"
+  },
+  {
+    "edge_id": "E006",
+    "from_node_id": "N016",
+    "to_node_id": "N017",
+    "straight_distance_km": 56.31,
+    "estimated_flow": 14112.0,
+    "rank": 6,
+    "od_count": 1,
+    "source": "all_od_weighted_kmeans"
+  },
+  {
+    "edge_id": "E007",
+    "from_node_id": "N013",
+    "to_node_id": "N017",
+    "straight_distance_km": 90.697,
+    "estimated_flow": 12608.0,
+    "rank": 7,
+    "od_count": 1,
+    "source": "all_od_weighted_kmeans"
+  },
+  {
+    "edge_id": "E008",
+    "from_node_id": "N019",
+    "to_node_id": "N020",
+    "straight_distance_km": 81.276,
+    "estimated_flow": 10044.0,
+    "rank": 8,
+    "od_count": 1,
+    "source": "all_od_weighted_kmeans"
+  },
+  {
+    "edge_id": "E009",
+    "from_node_id": "N005",
+    "to_node_id": "N007",
+    "straight_distance_km": 25.385,
+    "estimated_flow": 9544.0,
+    "rank": 9,
+    "od_count": 1,
+    "source": "all_od_weighted_kmeans"
+  }
+]

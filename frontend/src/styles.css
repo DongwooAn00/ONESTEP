@@ -232,6 +232,11 @@ button {
   border-top-style: dashed;
 }
 
+.legend.bridge {
+  border-color: #14a8b5;
+  border-top-style: dashed;
+}
+
 .map-selection-card {
   position: absolute;
   left: 18px;
@@ -634,6 +639,7 @@ button {
 }
 
 .plain-field input,
+.plain-field select,
 .post-form input,
 .post-form textarea {
   width: 100%;
@@ -648,6 +654,179 @@ button {
 .plain-field input {
   min-height: 40px;
   padding: 0 10px;
+}
+
+.plain-field select {
+  min-height: 40px;
+  padding: 0 10px;
+  color: #1f3042;
+  outline: 0;
+}
+
+.analysis-options {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0 4px;
+}
+
+.candidate-options {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.candidate-options .plain-field {
+  margin-bottom: 0;
+}
+
+.analysis-rule-list {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0 12px;
+}
+
+.analysis-rule-list span {
+  padding: 9px 10px;
+  border: 1px solid #dbe6ef;
+  border-radius: 7px;
+  background: #f7fafc;
+  color: #293a4c;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+button:disabled {
+  cursor: progress;
+  opacity: 0.72;
+}
+
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.download-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #d8e3ed;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #283a4d;
+  font-size: 13px;
+  font-weight: 850;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.iterative-stats {
+  margin-top: 8px;
+}
+
+.stats-grid span {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #dbe6ef;
+  border-radius: 7px;
+  background: #f7fafc;
+  color: #617588;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.stats-grid strong {
+  color: #1d3043;
+  font-size: 16px;
+}
+
+.edge-list {
+  display: grid;
+  gap: 10px;
+}
+
+.edge-card {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+  border: 1px solid #dbe6ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.edge-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.edge-card strong {
+  color: #1d3043;
+  font-size: 14px;
+}
+
+.edge-card small {
+  color: #708497;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.edge-card div {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.edge-card div span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: #66788a;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.edge-card div strong {
+  font-size: 13px;
+}
+
+.error-state span {
+  background: #fff2f2;
+  color: #d33843;
+}
+
+.error-copy {
+  color: #c4333c;
+}
+
+.ranked-route-card small {
+  text-transform: uppercase;
+}
+
+.candidate-node-overlay {
+  padding: 4px 7px;
+  border: 1px solid #0b7ff3;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0878ec;
+  font-size: 11px;
+  font-weight: 950;
+  white-space: nowrap;
+}
+
+.candidate-edge-label {
+  border-color: #e5484d;
+  color: #c9262b;
 }
 
 .point-state {
@@ -1149,7 +1328,10 @@ button {
   .point-state,
   .community-tabs,
   .post-form > div,
-  .candidate-stats {
+  .candidate-stats,
+  .stats-grid,
+  .candidate-options,
+  .edge-card div {
     grid-template-columns: 1fr;
   }
 
