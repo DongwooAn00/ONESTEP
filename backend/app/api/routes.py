@@ -9,7 +9,7 @@ from app.schemas.route_cost import EvaluateRouteRequest, EvaluateRouteResult, Ro
 from app.schemas.route_generation import RouteGenerationRequest, RouteGenerationResult
 from app.services.candidate_route_pipeline import build_candidate_routes
 from app.services.economic_analysis import analyze_project
-from app.services.od_candidate_generation import build_od_candidates
+from app.services.od_candidate_generation import build_od_candidates, build_od_candidates_with_supplemental
 from app.services.route_cost import analyze_route_cost, evaluate_route
 from app.services.route_generation import generate_route_candidates
 
@@ -50,6 +50,7 @@ async def create_od_candidates(
     min_estimated_flow: float | None = Form(default=None),
     sample_size: int | None = Form(default=None),
     file: bytes | None = File(default=None),
+    supplemental_file: bytes | None = File(default=None),
 ) -> ODCandidateResult:
     if top_node_limit < 1 or top_node_limit > 100:
         raise HTTPException(status_code=400, detail="top_node_limit must be between 1 and 100.")
@@ -63,6 +64,26 @@ async def create_od_candidates(
         raise HTTPException(status_code=400, detail="sample_size must be empty or greater than 0.")
 
     try:
+        base_source = StringIO(file.decode("utf-8-sig")) if file is not None else None
+        if supplemental_file is not None:
+            supplemental_csv = StringIO(supplemental_file.decode("utf-8-sig"))
+            source_name = (
+                "uploaded_od.csv + scenario_od.csv"
+                if file is not None
+                else "synthetic_admin_dong_od_by_mode.csv + scenario_od.csv"
+            )
+            return build_od_candidates_with_supplemental(
+                base_source,
+                supplemental_csv,
+                source_name,
+                flow_filter_percent=flow_filter_percent,
+                top_node_limit=top_node_limit,
+                low_impact_prune_percent=low_impact_prune_percent,
+                edge_limit=edge_limit,
+                min_estimated_flow=min_estimated_flow,
+                sample_size=sample_size,
+            )
+
         if file is None:
             return build_od_candidates(
                 None,
@@ -75,9 +96,8 @@ async def create_od_candidates(
                 sample_size=sample_size,
             )
 
-        uploaded_csv = StringIO(file.decode("utf-8-sig"))
         return build_od_candidates(
-            uploaded_csv,
+            base_source,
             "uploaded_od.csv",
             flow_filter_percent=flow_filter_percent,
             top_node_limit=top_node_limit,

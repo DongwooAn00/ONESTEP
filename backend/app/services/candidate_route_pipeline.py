@@ -9,6 +9,7 @@ from app.services import route_mvp_config as config
 from app.services.cost_grid import DemProvider, build_cost_grid
 from app.services.cost_model import calculate_route_costs
 from app.services.pathfinding import find_least_cost_path
+from app.services.road_graph_routing import build_road_graph_route
 from app.services.route_economics import calculate_distance_saving_km, rank_candidate_routes
 from app.services.route_segments import RouteSegmentDetail, classify_route_segments
 
@@ -21,6 +22,23 @@ def _route_length_km(cells) -> float:
         sum(math.hypot(end.x - start.x, end.y - start.y) for start, end in zip(cells, cells[1:])) / 1000.0,
         3,
     )
+
+
+def _route_context(cells, route_length_km: float) -> dict[str, float]:
+    road_access_length_km = 0.0
+    for start, end in zip(cells, cells[1:]):
+        if start.road_rank or end.road_rank:
+            road_access_length_km += math.hypot(end.x - start.x, end.y - start.y) / 1000.0
+
+    road_access_length_km = round(road_access_length_km, 3)
+    road_access_percent = round(
+        road_access_length_km / route_length_km * 100.0,
+        1,
+    ) if route_length_km > 0 else 0.0
+    return {
+        "existing_road_access_length_km": road_access_length_km,
+        "existing_road_access_percent": road_access_percent,
+    }
 
 
 def _route_geometry(cells) -> list[dict[str, float]]:
@@ -56,6 +74,9 @@ def _failed_route(edge: CandidateEdge, reason: str) -> dict:
         "max_slope": 0.0,
         "river_crossing_count": 0,
         "surface_road_length_km": 0.0,
+        "existing_road_length_km": 0.0,
+        "existing_tunnel_length_km": 0.0,
+        "new_surface_road_length_km": 0.0,
         "tunnel_length_km": 0.0,
         "bridge_length_km": 0.0,
         "tunnel_segment_count": 0,
@@ -63,6 +84,8 @@ def _failed_route(edge: CandidateEdge, reason: str) -> dict:
         "status": "failed",
         "failed_reason": reason,
         "distance_saving_km": 0.0,
+        "existing_road_access_length_km": 0.0,
+        "existing_road_access_percent": 0.0,
         "surface_road_cost": 0.0,
         "tunnel_cost": 0.0,
         "bridge_cost": 0.0,
@@ -73,7 +96,56 @@ def _failed_route(edge: CandidateEdge, reason: str) -> dict:
         "total_screen_cost": 0.0,
         "cost_assumptions": {},
         "segment_details": [],
+        "route_generation_method": "failed",
         "warnings": [],
+    }
+
+
+def _road_graph_route(
+    edge: CandidateEdge,
+    nodes: list[CandidateNode],
+    *,
+    route_id: str,
+) -> dict:
+    graph_route = build_road_graph_route(edge, nodes, route_id=route_id)
+    costs = calculate_route_costs(
+        graph_route.new_surface_road_length_km,
+        0.0,
+        0.0,
+    )
+    distance_saving_km = calculate_distance_saving_km(
+        straight_distance_km=edge.straight_distance_km,
+        new_route_length_km=graph_route.route_length_km,
+    )
+    return {
+        "route_id": route_id,
+        "from_node_id": edge.from_node_id,
+        "to_node_id": edge.to_node_id,
+        "estimated_flow": edge.estimated_flow,
+        "straight_distance_km": edge.straight_distance_km,
+        "route_geometry": graph_route.route_geometry,
+        "route_length_km": graph_route.route_length_km,
+        "total_grid_cost": 0.0,
+        "average_slope": 0.0,
+        "max_slope": 0.0,
+        "river_crossing_count": 0,
+        "surface_road_length_km": graph_route.new_surface_road_length_km,
+        "existing_road_length_km": graph_route.existing_road_length_km,
+        "existing_tunnel_length_km": graph_route.existing_tunnel_length_km,
+        "new_surface_road_length_km": graph_route.new_surface_road_length_km,
+        "tunnel_length_km": 0.0,
+        "bridge_length_km": 0.0,
+        "tunnel_segment_count": 0,
+        "bridge_segment_count": 0,
+        "status": "success",
+        "failed_reason": None,
+        "distance_saving_km": distance_saving_km,
+        "existing_road_access_length_km": graph_route.existing_road_access_length_km,
+        "existing_road_access_percent": graph_route.existing_road_access_percent,
+        "segment_details": graph_route.segment_details,
+        "route_generation_method": "road_graph_a_star",
+        "warnings": graph_route.warnings,
+        **costs,
     }
 
 
@@ -87,6 +159,14 @@ def evaluate_candidate_edge(
 ) -> dict:
     route_id = f"R{edge.rank:03d}"
     try:
+        if apply_optional_layers:
+            try:
+                return _road_graph_route(edge, nodes, route_id=route_id)
+            except Exception as graph_error:
+                graph_warning = f"{route_id}: 도로망 A* 경로 탐색 실패로 DEM 격자 경로를 사용했습니다: {graph_error}"
+            else:
+                graph_warning = ""
+
         grid, start, end = build_cost_grid(
             edge,
             nodes,
@@ -107,6 +187,7 @@ def evaluate_candidate_edge(
             path = find_least_cost_path(grid, start, end)
 
         route_length_km = _route_length_km(path.cells)
+        route_context = _route_context(path.cells, route_length_km)
         segment_summary = classify_route_segments(route_id, path.cells)
         details: list[RouteSegmentDetail] = segment_summary["segment_details"]
         average_slope = (
@@ -137,6 +218,9 @@ def evaluate_candidate_edge(
             "max_slope": round(max_slope, 2),
             "river_crossing_count": river_crossing_count,
             "surface_road_length_km": segment_summary["surface_road_length_km"],
+            "existing_road_length_km": 0.0,
+            "existing_tunnel_length_km": 0.0,
+            "new_surface_road_length_km": segment_summary["surface_road_length_km"],
             "tunnel_length_km": segment_summary["tunnel_length_km"],
             "bridge_length_km": segment_summary["bridge_length_km"],
             "tunnel_segment_count": segment_summary["tunnel_segment_count"],
@@ -144,8 +228,10 @@ def evaluate_candidate_edge(
             "status": "success",
             "failed_reason": None,
             "distance_saving_km": distance_saving_km,
+            **route_context,
             "segment_details": _segment_rows(route_id, details),
-            "warnings": grid.warnings,
+            "route_generation_method": "dem_grid_a_star",
+            "warnings": ([graph_warning] if apply_optional_layers and graph_warning else []) + grid.warnings,
             **costs,
         }
     except Exception as error:
@@ -167,6 +253,9 @@ def _build_output_files(rows: list[dict], ranked_rows: list[dict]) -> dict[str, 
             "to_node_id": row["to_node_id"],
             "route_geometry": row["route_geometry"],
             "route_length_km": row["route_length_km"],
+            "existing_road_access_length_km": row["existing_road_access_length_km"],
+            "existing_road_access_percent": row["existing_road_access_percent"],
+            "route_generation_method": row["route_generation_method"],
             "status": row["status"],
             "failed_reason": row["failed_reason"],
         }
@@ -181,6 +270,9 @@ def _build_output_files(rows: list[dict], ranked_rows: list[dict]) -> dict[str, 
         {
             "route_id": row["route_id"],
             "surface_road_length_km": row["surface_road_length_km"],
+            "existing_road_length_km": row["existing_road_length_km"],
+            "existing_tunnel_length_km": row["existing_tunnel_length_km"],
+            "new_surface_road_length_km": row["new_surface_road_length_km"],
             "tunnel_length_km": row["tunnel_length_km"],
             "bridge_length_km": row["bridge_length_km"],
             "surface_road_cost": row["surface_road_cost"],

@@ -252,7 +252,7 @@ def _road_multiplier(rank: object) -> tuple[float, str | None]:
         return config.HIGHWAY_ROAD_MULTIPLIER, "highway_or_national"
     if any(token in text for token in ("local", "province", "지방")):
         return config.LOCAL_ROAD_MULTIPLIER, "local"
-    return 1.0, None
+    return config.GENERAL_ROAD_MULTIPLIER, "road"
 
 
 def _slope_cost(slope_degrees: float) -> float:
@@ -311,7 +311,7 @@ def _calculate_slopes(cells: list[list[CostCell]], cell_size_m: float) -> None:
 def _apply_optional_rivers(grid: CostGrid) -> None:
     table = _find_existing_table(["rivers", "river_lines", "waterways", "streams"])
     if table is None:
-        grid.warnings.append("하천 데이터가 없어 하천 비용 및 교량 표시는 DEM 경로 이후 0으로 처리됩니다.")
+        grid.warnings.append("하천/수계 레이어가 없어 교량 구간과 하천 회피 비용을 반영하지 못했습니다.")
         return
 
     try:

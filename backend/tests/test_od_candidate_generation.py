@@ -1,8 +1,9 @@
+from io import StringIO
 from pathlib import Path
 
 import pytest
 
-from app.services.od_candidate_generation import build_od_candidates
+from app.services.od_candidate_generation import build_od_candidates, build_od_candidates_with_supplemental
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -48,6 +49,29 @@ def test_build_od_candidates_can_filter_top_percent():
     assert result.stats.selected_top_rows == 2
     assert result.nodes
     assert result.edges
+
+
+def test_build_od_candidates_can_merge_supplemental_scenario_od():
+    supplemental = StringIO(
+        "origin_latitude,origin_longitude,destination_latitude,destination_longitude,passenger_car,freight\n"
+        "36.30,127.30,36.80,127.80,10000,2000\n"
+        "36.35,127.35,36.85,127.85,12000,3000\n"
+    )
+
+    result = build_od_candidates_with_supplemental(
+        ROOT / "backend" / "tests" / "fixtures" / "od_sample_with_coords.csv",
+        supplemental,
+        "od_sample_with_coords.csv + scenario_od.csv",
+        low_impact_prune_percent=None,
+        top_node_limit=100,
+        persist_files=False,
+    )
+
+    assert result.nodes
+    assert result.edges
+    assert result.stats.total_od_rows == 14
+    assert result.stats.selected_top_rows == 14
+    assert any("2 supplemental rows" in warning for warning in result.stats.warnings)
 
 
 def test_build_od_candidates_reports_missing_coordinates(tmp_path):

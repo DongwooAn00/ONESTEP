@@ -6,6 +6,7 @@ import json
 import math
 import os
 import random
+import tempfile
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
@@ -33,6 +34,13 @@ DEFAULT_EDGE_LIMIT = 50
 DEFAULT_LOW_IMPACT_PRUNE_PERCENT = 20
 EDGE_BATCH_SIZE = 20_000
 RANDOM_SEED = 42
+STANDARD_OD_COLUMNS = [
+    "origin_latitude",
+    "origin_longitude",
+    "destination_latitude",
+    "destination_longitude",
+    "total_flow",
+]
 
 FLOW_GROUPS = {
     "car_flow": {
@@ -651,6 +659,108 @@ def _write_json(filename: str, payload: list[dict]) -> str:
     return str(path)
 
 
+def _append_standard_records(
+    source: str | Path | BinaryIO | None,
+    writer: csv.DictWriter,
+) -> tuple[int, int, int, int]:
+    active_source = source or DEFAULT_OD_CSV
+    total_rows, _, flow_columns, coordinate_columns, code_columns = load_od_data(active_source)
+    coordinate_lookup = _load_coordinate_lookup()
+
+    written_rows = 0
+    coordinate_excluded = 0
+    non_positive_excluded = 0
+    with _open_text(active_source) as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            record, missing_coordinates, non_positive_flow = _row_to_record(
+                row,
+                flow_columns,
+                coordinate_columns,
+                coordinate_lookup,
+                code_columns,
+            )
+            coordinate_excluded += int(missing_coordinates)
+            non_positive_excluded += int(non_positive_flow)
+            if record is None:
+                continue
+
+            writer.writerow(
+                {
+                    "origin_latitude": record.origin_latitude,
+                    "origin_longitude": record.origin_longitude,
+                    "destination_latitude": record.destination_latitude,
+                    "destination_longitude": record.destination_longitude,
+                    "total_flow": record.total_flow,
+                }
+            )
+            written_rows += 1
+
+    return total_rows, written_rows, coordinate_excluded, non_positive_excluded
+
+
+def build_od_candidates_with_supplemental(
+    source: str | Path | BinaryIO | None,
+    supplemental_source: str | Path | BinaryIO,
+    source_name: str,
+    *,
+    flow_filter_percent: int | None = None,
+    top_percent: int | None = None,
+    k_values: list[int] | None = None,
+    merge_distance_km: float = MERGE_DISTANCE_KM,
+    top_node_limit: int = DEFAULT_TOP_NODE_LIMIT,
+    low_impact_prune_percent: int | None = DEFAULT_LOW_IMPACT_PRUNE_PERCENT,
+    edge_limit: int = DEFAULT_EDGE_LIMIT,
+    min_estimated_flow: float | None = None,
+    sample_size: int | None = None,
+    persist_files: bool = True,
+) -> ODCandidateResult:
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", newline="", suffix=".csv", delete=False) as file:
+            temporary_path = Path(file.name)
+            writer = csv.DictWriter(file, fieldnames=STANDARD_OD_COLUMNS)
+            writer.writeheader()
+            base_total, base_written, base_coordinate_excluded, base_non_positive = _append_standard_records(source, writer)
+            supplemental_total, supplemental_written, supplemental_coordinate_excluded, supplemental_non_positive = (
+                _append_standard_records(supplemental_source, writer)
+            )
+
+        result = build_od_candidates(
+            temporary_path,
+            source_name,
+            flow_filter_percent=flow_filter_percent,
+            top_percent=top_percent,
+            k_values=k_values,
+            merge_distance_km=merge_distance_km,
+            top_node_limit=top_node_limit,
+            low_impact_prune_percent=low_impact_prune_percent,
+            edge_limit=edge_limit,
+            min_estimated_flow=min_estimated_flow,
+            sample_size=sample_size,
+            persist_files=persist_files,
+        )
+        result.stats.total_od_rows = base_total + supplemental_total
+        result.stats.coordinate_excluded_rows = base_coordinate_excluded + supplemental_coordinate_excluded
+        result.stats.non_positive_flow_excluded_rows = base_non_positive + supplemental_non_positive
+        result.stats.warnings.append(
+            f"Scenario OD merge is active: {supplemental_written} supplemental rows were added to "
+            f"{base_written} base OD rows before candidate generation."
+        )
+        if supplemental_coordinate_excluded:
+            result.stats.warnings.append(
+                f"{supplemental_coordinate_excluded} supplemental rows without valid coordinates were excluded."
+            )
+        if supplemental_non_positive:
+            result.stats.warnings.append(
+                f"{supplemental_non_positive} supplemental rows with non-positive total_flow were excluded."
+            )
+        return result
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
 def build_od_candidates(
     source: str | Path | BinaryIO | None,
     source_name: str,
@@ -710,6 +820,13 @@ def build_od_candidates(
         warnings.append(f"Sampling is active: clustering uses up to {sample_size} valid OD rows.")
     if active_filter_percent:
         warnings.append(f"OD flow filtering is active: top {active_filter_percent}% rows are used for clustering.")
+    if not records and coordinate_excluded_rows:
+        raise ValueError(
+            "Origin/destination coordinate columns were not found and "
+            f"{DEFAULT_COORDINATE_CSV.name} did not contain matching coordinates for the OD codes. "
+            "Add origin/destination coordinate columns to the OD CSV or ensure "
+            "admin_dong_code values match data/processed/admin_dong_coordinates.csv."
+        )
 
     raw_nodes = _weighted_kmeans_nodes(records, active_k_values)
     merged_nodes = _merge_nearby_nodes(raw_nodes, merge_distance_km)

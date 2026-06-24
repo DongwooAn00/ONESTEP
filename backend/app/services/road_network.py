@@ -45,6 +45,12 @@ def _import_osr():
     return osr
 
 
+def _import_pyproj():
+    from pyproj import CRS, Transformer
+
+    return CRS, Transformer
+
+
 @lru_cache(maxsize=1)
 def _spatial_refs():
     osr = _import_osr()
@@ -63,17 +69,39 @@ def _spatial_refs():
     }
 
 
+@lru_cache(maxsize=1)
+def _pyproj_transformers():
+    crs, transformer = _import_pyproj()
+    wgs84 = crs.from_epsg(4326)
+    road_srs = crs.from_proj4(ROAD_PROJ4)
+    return {
+        "wgs84_to_road": transformer.from_crs(wgs84, road_srs, always_xy=True),
+        "road_to_wgs84": transformer.from_crs(road_srs, wgs84, always_xy=True),
+    }
+
+
 def _transform(transform, x: float, y: float) -> ProjectedPoint:
     tx, ty, _ = transform.TransformPoint(x, y)
     return ProjectedPoint(tx, ty)
 
 
+def _transform_pyproj(transform, x: float, y: float) -> ProjectedPoint:
+    tx, ty = transform.transform(x, y)
+    return ProjectedPoint(tx, ty)
+
+
 def to_road_point(lat: float, lon: float) -> ProjectedPoint:
-    return _transform(_spatial_refs()["wgs84_to_road"], lon, lat)
+    try:
+        return _transform(_spatial_refs()["wgs84_to_road"], lon, lat)
+    except ImportError:
+        return _transform_pyproj(_pyproj_transformers()["wgs84_to_road"], lon, lat)
 
 
 def to_coordinate(x: float, y: float) -> Coordinate:
-    point = _transform(_spatial_refs()["road_to_wgs84"], x, y)
+    try:
+        point = _transform(_spatial_refs()["road_to_wgs84"], x, y)
+    except ImportError:
+        point = _transform_pyproj(_pyproj_transformers()["road_to_wgs84"], x, y)
     return Coordinate(lat=point.y, lon=point.x)
 
 

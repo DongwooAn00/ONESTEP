@@ -26,7 +26,7 @@ import {
 const KAKAO_MAP_JS_KEY = import.meta.env.VITE_KAKAO_MAP_JS_KEY;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const DEFAULT_CENTER = { lat: 36.35, lng: 127.85 };
-const DEFAULT_MAP_LEVEL = 13;
+const DEFAULT_MAP_LEVEL = 11;
 
 let kakaoMapSdkPromise;
 
@@ -174,6 +174,36 @@ function downloadJson(filename, payload) {
   URL.revokeObjectURL(url);
 }
 
+function csvCell(value) {
+  const text = String(value ?? "");
+  return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+
+function buildScenarioOdCsv(scenario) {
+  const headers = [
+    "od_name",
+    "origin_latitude",
+    "origin_longitude",
+    "destination_latitude",
+    "destination_longitude",
+    "passenger_car",
+    "freight",
+  ];
+  const rows = (scenario?.ods || [])
+    .filter((od) => od.start && od.end)
+    .map((od) => [
+      od.name,
+      od.start.lat,
+      od.start.lng,
+      od.end.lat,
+      od.end.lng,
+      Number(od.traffic || 0),
+      Number(od.freight || 0),
+    ]);
+
+  return [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+}
+
 function formatPoint(point) {
   if (!point) {
     return "선택 안 됨";
@@ -301,6 +331,8 @@ function RouteMap({
   const linesRef = useRef([]);
   const overlaysRef = useRef([]);
   const [loadError, setLoadError] = useState("");
+  const [renderError, setRenderError] = useState("");
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     onSelectPointRef.current = onSelectPoint;
@@ -335,6 +367,7 @@ function RouteMap({
         kakao.maps.event.addListener(map, "click", clickHandler);
         mapRef.current = map;
         clickHandlerRef.current = clickHandler;
+        setMapReady(true);
 
         window.setTimeout(() => map.relayout(), 80);
       })
@@ -354,7 +387,7 @@ function RouteMap({
   }, []);
 
   useEffect(() => {
-    if (!window.kakao?.maps || !mapRef.current) {
+    if (!mapReady || !window.kakao?.maps || !mapRef.current) {
       return;
     }
 
@@ -363,14 +396,63 @@ function RouteMap({
     const allRoutes = [...routes, ...(draftRoute ? [draftRoute] : [])];
     const bounds = new kakao.maps.LatLngBounds();
     let hasBounds = false;
+    const viewCoordinates = [];
 
-    markersRef.current.forEach((marker) => marker.setMap(null));
-    linesRef.current.forEach((line) => line.setMap(null));
-    overlaysRef.current.forEach((overlay) => overlay.setMap(null));
-    markersRef.current = [];
-    linesRef.current = [];
-    overlaysRef.current = [];
+    const toFiniteNumber = (value) => {
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
+    };
 
+    const toLatLng = (latValue, lonValue) => {
+      const lat = toFiniteNumber(latValue);
+      const lon = toFiniteNumber(lonValue);
+      if (lat === null || lon === null || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+        return null;
+      }
+      return new kakao.maps.LatLng(lat, lon);
+    };
+
+    const includeInView = (position) => {
+      bounds.extend(position);
+      viewCoordinates.push({ lat: position.getLat(), lon: position.getLng() });
+      hasBounds = true;
+    };
+
+    const fitMapToView = () => {
+      if (!viewCoordinates.length) {
+        map.setCenter(new kakao.maps.LatLng(DEFAULT_CENTER.lat, DEFAULT_CENTER.lng));
+        map.setLevel(DEFAULT_MAP_LEVEL);
+        return;
+      }
+
+      const minLat = Math.min(...viewCoordinates.map((point) => point.lat));
+      const maxLat = Math.max(...viewCoordinates.map((point) => point.lat));
+      const minLon = Math.min(...viewCoordinates.map((point) => point.lon));
+      const maxLon = Math.max(...viewCoordinates.map((point) => point.lon));
+      const latSpan = maxLat - minLat;
+      const lonSpan = maxLon - minLon;
+      const maxSpan = Math.max(latSpan, lonSpan);
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLon = (minLon + maxLon) / 2;
+      const level = maxSpan > 2.5 ? 11 : maxSpan > 1.2 ? 10 : maxSpan > 0.55 ? 9 : maxSpan > 0.22 ? 8 : 6;
+
+      map.setCenter(new kakao.maps.LatLng(centerLat, centerLon));
+      map.setLevel(level);
+    };
+
+    const clearMapItems = () => {
+      markersRef.current.forEach((marker) => marker.setMap(null));
+      linesRef.current.forEach((line) => line.setMap(null));
+      overlaysRef.current.forEach((overlay) => overlay.setMap(null));
+      markersRef.current = [];
+      linesRef.current = [];
+      overlaysRef.current = [];
+    };
+
+    clearMapItems();
+    setRenderError("");
+
+    try {
     allRoutes.forEach((route, index) => {
       const color = route.color || candidateTemplates[index % candidateTemplates.length].color;
       const markerPoints = [
@@ -383,18 +465,25 @@ function RouteMap({
           return;
         }
 
-        const position = new kakao.maps.LatLng(point.lat, point.lng);
-        bounds.extend(position);
-        hasBounds = true;
+        const position = toLatLng(point.lat, point.lng);
+        if (!position) {
+          return;
+        }
+        includeInView(position);
 
         const marker = new kakao.maps.Marker({ map, position, title });
         markersRef.current.push(marker);
       });
 
       if (route.start && route.end) {
+        const startPosition = toLatLng(route.start.lat, route.start.lng);
+        const endPosition = toLatLng(route.end.lat, route.end.lng);
+        if (!startPosition || !endPosition) {
+          return;
+        }
         const path = [
-          new kakao.maps.LatLng(route.start.lat, route.start.lng),
-          new kakao.maps.LatLng(route.end.lat, route.end.lng)
+          startPosition,
+          endPosition
         ];
         const distance = getStraightDistanceMeters(route.start, route.end);
 
@@ -414,10 +503,10 @@ function RouteMap({
 
         const overlay = new kakao.maps.CustomOverlay({
           map,
-          position: new kakao.maps.LatLng(
+          position: toLatLng(
             (route.start.lat + route.end.lat) / 2,
             (route.start.lng + route.end.lng) / 2
-          ),
+          ) || startPosition,
           content: label,
           yAnchor: 1.4
         });
@@ -434,15 +523,22 @@ function RouteMap({
       }
 
       const segmentStyle = {
-        surface_road: { color: "#0b7ff3", weight: 5, opacity: 0.82, style: "solid" },
+        surface_road: { color: "#f59e0b", weight: 6, opacity: 0.9, style: "solid" },
+        new_surface_road: { color: "#f59e0b", weight: 6, opacity: 0.9, style: "solid" },
+        existing_road: { color: "#1f9d55", weight: 4, opacity: 0.78, style: "solid" },
+        existing_tunnel: { color: "#5b4bb7", weight: 5, opacity: 0.86, style: "shortdash" },
         tunnel: { color: "#7f57d9", weight: 6, opacity: 0.9, style: "shortdash" },
         bridge: { color: "#14a8b5", weight: 6, opacity: 0.9, style: "dash" }
       }[segment.segment_type] || { color: "#0b7ff3", weight: 5, opacity: 0.82, style: "solid" };
 
-      const path = coordinates.map((point) => new kakao.maps.LatLng(point.lat, point.lon));
+      const path = coordinates
+        .map((point) => toLatLng(point.lat, point.lon ?? point.lng ?? point.longitude))
+        .filter(Boolean);
+      if (path.length < 2) {
+        return;
+      }
       path.forEach((point) => {
-        bounds.extend(point);
-        hasBounds = true;
+        includeInView(point);
       });
 
       const line = new kakao.maps.Polyline({
@@ -465,10 +561,12 @@ function RouteMap({
           return;
         }
 
-        const path = [
-          new kakao.maps.LatLng(fromNode.latitude, fromNode.longitude),
-          new kakao.maps.LatLng(toNode.latitude, toNode.longitude)
-        ];
+        const fromPosition = toLatLng(fromNode.latitude, fromNode.longitude);
+        const toPosition = toLatLng(toNode.latitude, toNode.longitude);
+        if (!fromPosition || !toPosition) {
+          return;
+        }
+        const path = [fromPosition, toPosition];
         const line = new kakao.maps.Polyline({
           map,
           path,
@@ -484,10 +582,10 @@ function RouteMap({
         label.textContent = `#${edge.rank} ${edge.straight_distance_km.toFixed(1)} km / ${formatNumber(edge.estimated_flow)}`;
         const overlay = new kakao.maps.CustomOverlay({
           map,
-          position: new kakao.maps.LatLng(
+          position: toLatLng(
             (fromNode.latitude + toNode.latitude) / 2,
             (fromNode.longitude + toNode.longitude) / 2
-          ),
+          ) || fromPosition,
           content: label,
           yAnchor: 1.4
         });
@@ -496,9 +594,11 @@ function RouteMap({
     }
 
     candidateNodes.forEach((node) => {
-      const position = new kakao.maps.LatLng(node.latitude, node.longitude);
-      bounds.extend(position);
-      hasBounds = true;
+      const position = toLatLng(node.latitude, node.longitude);
+      if (!position) {
+        return;
+      }
+      includeInView(position);
 
       const marker = new kakao.maps.Marker({
         map,
@@ -520,12 +620,46 @@ function RouteMap({
     });
 
     window.setTimeout(() => {
-      map.relayout();
-      if (hasBounds) {
-        map.setBounds(bounds);
+      try {
+        map.relayout();
+        if (hasBounds) {
+          fitMapToView();
+          window.setTimeout(() => map.relayout(), 120);
+        }
+      } catch (error) {
+        setRenderError(error.message || "지도 범위를 적용하는 중 오류가 발생했습니다.");
       }
     }, 80);
-  }, [routes, draftRoute, candidateNodes, candidateEdges, candidateRouteSegments]);
+    } catch (error) {
+      clearMapItems();
+      setRenderError(error.message || "지도 결과를 그리는 중 오류가 발생했습니다.");
+      window.setTimeout(() => map.relayout(), 80);
+    }
+  }, [mapReady, routes, draftRoute, candidateNodes, candidateEdges, candidateRouteSegments]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !containerRef.current) {
+      return;
+    }
+
+    const map = mapRef.current;
+    const relayout = () => {
+      window.setTimeout(() => map.relayout(), 0);
+      window.setTimeout(() => map.relayout(), 120);
+      window.setTimeout(() => map.relayout(), 320);
+    };
+
+    relayout();
+
+    if (typeof ResizeObserver === "undefined") {
+      window.addEventListener("resize", relayout);
+      return () => window.removeEventListener("resize", relayout);
+    }
+
+    const observer = new ResizeObserver(relayout);
+    observer.observe(containerRef.current);
+    return () => observer.disconnect();
+  }, [mapReady]);
 
   return (
     <div className={`live-map-wrap ${compact ? "compact-map" : ""}`}>
@@ -534,6 +668,12 @@ function RouteMap({
         <div className="map-error">
           <strong>지도를 불러올 수 없습니다.</strong>
           <span>{loadError}</span>
+        </div>
+      )}
+      {renderError && (
+        <div className="map-render-warning">
+          <strong>지도 결과 표시 오류</strong>
+          <span>{renderError}</span>
         </div>
       )}
       {helperText && (
@@ -550,6 +690,7 @@ function RouteMap({
 function Header({ activePage, onPageChange, onShowGuide }) {
   const pages = [
     { id: "analysis", label: "기존 페이지", icon: BarChart3 },
+    { id: "od-mvp", label: "OD 후보 생성", icon: Network },
     { id: "create", label: "시나리오 생성", icon: ListPlus },
     { id: "community", label: "커뮤니티", icon: MessageSquareText }
   ];
@@ -1357,10 +1498,12 @@ function PostList({ posts, onLikePost }) {
   );
 }
 
-function AnalysisMvpPage() {
+function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const [analysisStatus, setAnalysisStatus] = useState("idle");
   const [routeStatus, setRouteStatus] = useState("idle");
   const [uploadedFile, setUploadedFile] = useState(null);
+  const [includeScenarioOd, setIncludeScenarioOd] = useState(true);
+  const [supplementalScenarioId, setSupplementalScenarioId] = useState(selectedScenarioId || scenarios[0]?.id || "");
   const [candidateResult, setCandidateResult] = useState(null);
   const [candidateRouteResult, setCandidateRouteResult] = useState(null);
   const [routeLimit, setRouteLimit] = useState(20);
@@ -1370,6 +1513,17 @@ function AnalysisMvpPage() {
   const [sampleSize, setSampleSize] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [routeErrorMessage, setRouteErrorMessage] = useState("");
+  const supplementalScenario = useMemo(
+    () => scenarios.find((scenario) => scenario.id === supplementalScenarioId) || scenarios[0],
+    [scenarios, supplementalScenarioId]
+  );
+  const supplementalOdCount = supplementalScenario?.ods?.length || 0;
+
+  useEffect(() => {
+    if (!supplementalScenarioId && selectedScenarioId) {
+      setSupplementalScenarioId(selectedScenarioId);
+    }
+  }, [selectedScenarioId, supplementalScenarioId]);
 
   const runCandidateGeneration = async () => {
     setAnalysisStatus("loading");
@@ -1393,6 +1547,11 @@ function AnalysisMvpPage() {
     }
     if (uploadedFile) {
       formData.append("file", uploadedFile);
+    }
+    if (includeScenarioOd && supplementalScenario && supplementalOdCount > 0) {
+      const scenarioCsv = buildScenarioOdCsv(supplementalScenario);
+      const scenarioFile = new File([scenarioCsv], "scenario_od.csv", { type: "text/csv" });
+      formData.append("supplemental_file", scenarioFile);
     }
 
     try {
@@ -1471,6 +1630,32 @@ function AnalysisMvpPage() {
             onChange={(event) => setUploadedFile(event.target.files?.[0] || null)}
           />
         </label>
+
+        <div className="analysis-options candidate-options">
+          <label className="plain-field">
+            <span>추가 OD 시나리오</span>
+            <select
+              value={supplementalScenario?.id || ""}
+              onChange={(event) => setSupplementalScenarioId(event.target.value)}
+              disabled={!scenarios.length}
+            >
+              {scenarios.map((scenario) => (
+                <option key={scenario.id} value={scenario.id}>
+                  {scenario.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="checkbox-field">
+            <input
+              type="checkbox"
+              checked={includeScenarioOd}
+              onChange={(event) => setIncludeScenarioOd(event.target.checked)}
+              disabled={!supplementalOdCount}
+            />
+            <span>기존 OD에 선택 시나리오 OD {formatNumber(supplementalOdCount)}개 더하기</span>
+          </label>
+        </div>
 
         <div className="analysis-rule-list">
           <span>전체 OD 기본 사용</span>
@@ -1552,6 +1737,10 @@ function AnalysisMvpPage() {
           <div className="map-toolbar">
             <span className="legend candidate" />
             전체 OD 가중치 기반 후보 정점
+            <span className="legend existing-road" />
+            기존도로
+            <span className="legend new-road" />
+            신설도로
             <span className="legend tunnel" />
             터널
             <span className="legend bridge" />
@@ -1633,7 +1822,7 @@ function AnalysisMvpPage() {
               </span>
               <span>
                 터널 구간
-                <strong>{formatNumber(routeSegments.filter((segment) => segment.segment_type === "tunnel").length)}</strong>
+                <strong>{formatNumber(routeSegments.filter((segment) => ["tunnel", "existing_tunnel"].includes(segment.segment_type)).length)}</strong>
               </span>
               <span>
                 교량 구간
@@ -1767,10 +1956,15 @@ function AnalysisMvpPage() {
                     </header>
                     <div>
                       <span>총 노선 길이 <strong>{route.summary.route_length_km.toFixed(2)} km</strong></span>
+                      <span>기존 도로 접근 <strong>{Number(route.summary.existing_road_access_percent || 0).toFixed(1)}%</strong></span>
                       <span>예상 수요 <strong>{formatNumber(route.estimated_flow)}</strong></span>
-                      <span>지상도로 <strong>{route.summary.surface_road_length_km.toFixed(2)} km</strong></span>
-                      <span>터널 <strong>{route.summary.tunnel_length_km.toFixed(2)} km</strong></span>
+                      <span>거리 절감 <strong>{Number(route.summary.distance_saving_km || route.distance_saving_km || 0).toFixed(2)} km</strong></span>
+                      <span>기존도로 <strong>{Number(route.summary.existing_road_length_km || 0).toFixed(2)} km</strong></span>
+                      <span>기존터널 <strong>{Number(route.summary.existing_tunnel_length_km || 0).toFixed(2)} km</strong></span>
+                      <span>신설 지상도로 <strong>{Number(route.summary.new_surface_road_length_km ?? route.summary.surface_road_length_km).toFixed(2)} km</strong></span>
+                      <span>신설터널 <strong>{route.summary.tunnel_length_km.toFixed(2)} km</strong></span>
                       <span>교량 <strong>{route.summary.bridge_length_km.toFixed(2)} km</strong></span>
+                      <span>수요x절감 <strong>{formatNumber(route.summary.benefit_proxy || 0)}</strong></span>
                       <span>직접공사비 <strong>{formatMoneyEok(cost?.total_direct_cost)}</strong></span>
                       <span>예비율 포함 공사비 <strong>{formatMoneyEok(route.total_screen_cost)}</strong></span>
                       <span>MVP 예비 경제성 점수 <strong>{route.economic_score.toFixed(1)}</strong></span>
@@ -1838,7 +2032,18 @@ function App() {
       {showGuide && <GuideDialog onClose={() => setShowGuide(false)} />}
 
       {activePage === "analysis" && (
-        <AnalysisMvpPage />
+        <AnalysisPage
+          scenarios={scenarios}
+          selectedScenario={selectedScenario}
+          selectedScenarioId={selectedScenarioId}
+          onSelectScenario={setSelectedScenarioId}
+          onImportScenario={addScenario}
+          onGoCreate={() => setActivePage("create")}
+        />
+      )}
+
+      {activePage === "od-mvp" && (
+        <AnalysisMvpPage scenarios={scenarios} selectedScenarioId={selectedScenarioId} />
       )}
 
       {activePage === "create" && <ScenarioCreatePage onSaveScenario={handleSaveScenario} />}

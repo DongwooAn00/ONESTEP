@@ -20,6 +20,9 @@ class CandidateRoute(BaseModel):
     to_node_id: str
     route_geometry: list[CandidateRouteGeometry]
     route_length_km: float
+    existing_road_access_length_km: float = 0.0
+    existing_road_access_percent: float = 0.0
+    route_generation_method: str = "unknown"
     status: str
     failed_reason: str | None = None
 
@@ -37,6 +40,9 @@ class CandidateRouteSegment(BaseModel):
 class CandidateRouteCost(BaseModel):
     route_id: str
     surface_road_length_km: float
+    existing_road_length_km: float = 0.0
+    existing_tunnel_length_km: float = 0.0
+    new_surface_road_length_km: float = 0.0
     tunnel_length_km: float
     bridge_length_km: float
     surface_road_cost: float

@@ -227,6 +227,14 @@ button {
   border-color: #0b7ff3;
 }
 
+.legend.existing-road {
+  border-color: #1f9d55;
+}
+
+.legend.new-road {
+  border-color: #f59e0b;
+}
+
 .legend.tunnel {
   border-color: #7f57d9;
   border-top-style: dashed;
@@ -301,6 +309,28 @@ button {
 
 .map-error span {
   color: #6d7e8f;
+  font-size: 13px;
+}
+
+.map-render-warning {
+  position: absolute;
+  right: 18px;
+  bottom: 18px;
+  z-index: 8;
+  display: grid;
+  gap: 4px;
+  max-width: min(360px, calc(100% - 36px));
+  padding: 10px 12px;
+  border: 1px solid #f1c8c8;
+  border-radius: 8px;
+  background: rgba(255, 248, 248, 0.96);
+  box-shadow: 0 8px 20px rgba(27, 48, 70, 0.14);
+  color: #8c2525;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.map-render-warning strong {
   font-size: 13px;
 }
 
@@ -677,6 +707,23 @@ button {
 
 .candidate-options .plain-field {
   margin-bottom: 0;
+}
+
+.checkbox-field {
+  display: flex;
+  min-height: 40px;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  color: #293a4c;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.checkbox-field input {
+  width: 16px;
+  height: 16px;
+  accent-color: #2b8cf0;
 }
 
 .analysis-rule-list {

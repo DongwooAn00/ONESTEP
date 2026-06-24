@@ -1,14 +1,18 @@
 from __future__ import annotations
 
-from pathlib import Path
+import csv
+import shutil
+from pathlib import Path, PurePosixPath
 
-from load_postgis import CONTAINER_CSV_DIR, CSV_DIR, run_psql, wait_for_database
+from load_postgis import CSV_DIR, ROOT, run_psql, wait_for_database
 
 
 TABLES = [
     ("admin_dongs", "admin_dongs.csv"),
     ("admin_dong_od_by_mode", "synthetic_admin_dong_od_by_mode.csv"),
 ]
+SOURCE_CSV_DIR = ROOT / "data" / "processed"
+CONTAINER_ADMIN_DONG_OD_CSV_DIR = PurePosixPath("/workspace/data/processed/csv")
 
 TABLE_SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS admin_dongs (
@@ -21,7 +25,9 @@ CREATE TABLE IF NOT EXISTS admin_dongs (
     population integer NOT NULL,
     population_source text NOT NULL,
     origin_weight double precision NOT NULL,
-    destination_weight double precision NOT NULL
+    destination_weight double precision NOT NULL,
+    representative_lat double precision,
+    representative_lon double precision
 );
 
 CREATE TABLE IF NOT EXISTS admin_dong_od_by_mode (
@@ -42,6 +48,12 @@ CREATE TABLE IF NOT EXISTS admin_dong_od_by_mode (
     data_source text NOT NULL,
     PRIMARY KEY (origin_admin_dong_code, destination_admin_dong_code)
 );
+"""
+
+ALTER_SCHEMA_SQL = """
+ALTER TABLE admin_dongs
+    ADD COLUMN IF NOT EXISTS representative_lat double precision,
+    ADD COLUMN IF NOT EXISTS representative_lon double precision;
 """
 
 INDEX_SQL = """
@@ -65,6 +77,33 @@ DROP INDEX IF EXISTS idx_admin_dong_od_data_source;
 """
 
 
+def stage_csv_files() -> None:
+    CSV_DIR.mkdir(parents=True, exist_ok=True)
+    for _, filename in TABLES:
+        source = SOURCE_CSV_DIR / filename
+        destination = CSV_DIR / filename
+        if not source.exists():
+            continue
+        if filename == "admin_dongs.csv":
+            with source.open("r", encoding="utf-8-sig", newline="") as input_file:
+                reader = csv.DictReader(input_file)
+                fieldnames = reader.fieldnames or []
+                rows = []
+                for row in reader:
+                    for column in ("representative_lat", "representative_lon"):
+                        if row.get(column, "").strip().upper() == "NULL":
+                            row[column] = ""
+                    rows.append(row)
+
+            with destination.open("w", encoding="utf-8", newline="") as output_file:
+                writer = csv.DictWriter(output_file, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+            continue
+
+        shutil.copy2(source, destination)
+
+
 def assert_csv_files_exist() -> None:
     missing_files = [filename for _, filename in TABLES if not (CSV_DIR / filename).exists()]
     if missing_files:
@@ -73,9 +112,11 @@ def assert_csv_files_exist() -> None:
 
 
 def main() -> None:
+    stage_csv_files()
     assert_csv_files_exist()
     wait_for_database()
     run_psql(TABLE_SCHEMA_SQL)
+    run_psql(ALTER_SCHEMA_SQL)
     run_psql(DROP_INDEX_SQL)
     run_psql(
         """
@@ -87,8 +128,8 @@ def main() -> None:
     )
 
     for table_name, filename in TABLES:
-        csv_path = Path(CONTAINER_CSV_DIR / filename)
-        run_psql(f"\\copy {table_name} FROM '{csv_path}' WITH (FORMAT csv, HEADER true)")
+        csv_path = CONTAINER_ADMIN_DONG_OD_CSV_DIR / filename
+        run_psql(f"\\copy {table_name} FROM '{csv_path}' WITH (FORMAT csv, HEADER true, NULL '')")
 
     run_psql(INDEX_SQL)
 
