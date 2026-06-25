@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-GEOLOGY_DIR = ROOT / "data" / "raw" / "수치지질도_25만축척_전국"
+GEOLOGY_DIR = ROOT / "data" / "raw" / "geology_250k"
 GEOLOGY_SRID = 4326
 DBF_ENCODING = os.environ.get("GEOLOGY_DBF_ENCODING", "UTF-8")
 

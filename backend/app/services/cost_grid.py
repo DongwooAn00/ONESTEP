@@ -32,6 +32,8 @@ class CostCell:
     river_rank: str | None = None
     road_rank: str | None = None
     protected: bool = False
+    building: bool = False
+    builtup_area: bool = False
 
     @property
     def is_river(self) -> bool:
@@ -373,7 +375,7 @@ def _apply_optional_roads(grid: CostGrid) -> None:
         grid.warnings.append(f"기존 도로망 비용 보정을 건너뜁니다: {error}")
 
 
-def _apply_optional_protected_areas(grid: CostGrid) -> None:
+def _apply_optional_protected_areas_legacy(grid: CostGrid) -> None:
     table = _find_existing_table(["protected_areas", "urban_areas", "builtup_areas"])
     if table is None:
         return
@@ -406,6 +408,106 @@ def _apply_optional_protected_areas(grid: CostGrid) -> None:
                             cell.cost *= 3.0
     except Exception as error:
         grid.warnings.append(f"보호구역/시가지 비용 보정을 건너뜁니다: {error}")
+
+
+def _apply_optional_protected_areas(grid: CostGrid) -> None:
+    protected_table = _find_existing_table(["protected_areas"])
+    building_table = _find_existing_table(["building_footprints"])
+    builtup_table = _find_existing_table(["builtup_areas", "urban_areas"])
+
+    if protected_table is None and building_table is None and builtup_table is None:
+        grid.warnings.append("건물/시가지 레이어가 없어 건물 및 시가지 회피 비용을 반영하지 못했습니다.")
+        return
+
+    try:
+        with connect() as connection:
+            with connection.cursor() as cursor:
+                for row_cells in grid.cells:
+                    for cell in row_cells:
+                        if protected_table is not None:
+                            cursor.execute(
+                                f"""
+                                WITH input_point AS (
+                                    SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100002) AS geom
+                                )
+                                SELECT COALESCE(area_type, type, name, '') AS area_type
+                                FROM {protected_table}, input_point
+                                WHERE ST_Intersects({protected_table}.geom, input_point.geom)
+                                LIMIT 1;
+                                """,
+                                (cell.x, cell.y),
+                            )
+                            result = cursor.fetchone()
+                            area_type = str(result[0] or "").lower() if result else ""
+                            if result and ("protect" in area_type or "보호" in area_type):
+                                cell.cost = config.PROTECTED_AREA_BLOCK_COST
+                                cell.protected = True
+                                continue
+
+                        if building_table is not None:
+                            cursor.execute(
+                                f"""
+                                WITH input_point AS (
+                                    SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100002) AS geom
+                                )
+                                SELECT 1
+                                FROM {building_table}, input_point
+                                WHERE ST_Intersects({building_table}.geom, input_point.geom)
+                                LIMIT 1;
+                                """,
+                                (cell.x, cell.y),
+                            )
+                            if cursor.fetchone():
+                                cell.cost = config.BUILDING_BLOCK_COST
+                                cell.protected = True
+                                cell.building = True
+                                continue
+
+                            cursor.execute(
+                                f"""
+                                WITH input_point AS (
+                                    SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100002) AS geom
+                                )
+                                SELECT 1
+                                FROM {building_table}, input_point
+                                WHERE ST_DWithin({building_table}.geom, input_point.geom, %s)
+                                LIMIT 1;
+                                """,
+                                (cell.x, cell.y, config.BUILDING_BUFFER_M),
+                            )
+                            if cursor.fetchone():
+                                cell.cost *= config.BUILDING_BUFFER_MULTIPLIER
+                                cell.builtup_area = True
+                                continue
+
+                        if builtup_table is not None:
+                            cursor.execute(
+                                f"""
+                                WITH input_point AS (
+                                    SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100002) AS geom
+                                )
+                                SELECT COALESCE(area_type, type, name, '') AS area_type
+                                FROM {builtup_table}, input_point
+                                WHERE ST_Intersects({builtup_table}.geom, input_point.geom)
+                                LIMIT 1;
+                                """,
+                                (cell.x, cell.y),
+                            )
+                            result = cursor.fetchone()
+                            if not result:
+                                continue
+                            area_type = str(result[0] or "").lower()
+                            if "protect" in area_type or "보호" in area_type:
+                                cell.cost = config.PROTECTED_AREA_BLOCK_COST
+                                cell.protected = True
+                            elif "building" in area_type or "건물" in area_type:
+                                cell.cost *= config.BUILTUP_AREA_MULTIPLIER
+                                cell.builtup_area = True
+                            else:
+                                cell.cost *= config.URBAN_AREA_MULTIPLIER
+                                cell.builtup_area = True
+    except Exception as error:
+        grid.warnings.append(f"건물/시가지 비용 보정을 건너뜁니다: {error}")
 
 
 def build_cost_grid(

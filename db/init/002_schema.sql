@@ -39,7 +39,9 @@ CREATE TABLE IF NOT EXISTS admin_dongs (
     population integer NOT NULL,
     population_source text NOT NULL,
     origin_weight double precision NOT NULL,
-    destination_weight double precision NOT NULL
+    destination_weight double precision NOT NULL,
+    representative_lat double precision,
+    representative_lon double precision
 );
 
 CREATE TABLE IF NOT EXISTS admin_dong_od_by_mode (

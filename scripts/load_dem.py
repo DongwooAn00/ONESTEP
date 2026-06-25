@@ -6,7 +6,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-DEM_PATH = ROOT / "data" / "raw" / "한반도90m_GRS80.img"
 DEM_SRID = 100002
 
 DEM_SRS_SQL = """
@@ -26,6 +25,18 @@ SET auth_name = EXCLUDED.auth_name,
     srtext = EXCLUDED.srtext,
     proj4text = EXCLUDED.proj4text;
 """
+
+
+def dem_path() -> Path:
+    ascii_path = ROOT / "data" / "raw" / "dem.img"
+    if ascii_path.exists():
+        return ascii_path
+
+    matches = list((ROOT / "data" / "raw").glob("*GRS80.img"))
+    if len(matches) != 1:
+        joined = ", ".join(str(path) for path in matches) or "없음"
+        raise FileNotFoundError(f"DEM 파일 후보가 1개여야 합니다: {joined}")
+    return matches[0]
 
 
 def wait_for_database() -> None:
@@ -77,6 +88,7 @@ def run_psql(sql: str) -> None:
 
 
 def load_dem() -> None:
+    path = dem_path()
     raster2pgsql = subprocess.Popen(
         [
             "raster2pgsql",
@@ -87,7 +99,7 @@ def load_dem() -> None:
             str(DEM_SRID),
             "-t",
             "256x256",
-            str(DEM_PATH),
+            str(path),
             "dem_elevation",
         ],
         cwd=ROOT,
@@ -128,8 +140,7 @@ def load_dem() -> None:
 
 
 def assert_dem_exists() -> None:
-    if not DEM_PATH.exists():
-        raise FileNotFoundError(f"DEM 파일이 없습니다: {DEM_PATH}")
+    dem_path()
 
 
 def main() -> None:

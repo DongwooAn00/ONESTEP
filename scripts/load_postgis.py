@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import subprocess
 import time
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 
 ROOT = Path(__file__).resolve().parents[1]
 CSV_DIR = ROOT / "data" / "processed" / "csv"
-CONTAINER_CSV_DIR = Path("/workspace/data/processed/csv")
+CONTAINER_CSV_DIR = PurePosixPath("/workspace/data/processed/csv")
 
 TABLES = [
     ("zones", "zones.csv"),
@@ -20,6 +20,12 @@ TABLES = [
     ("freight_tonnage_od", "freight_tonnage_od.csv"),
     ("freight_tonnage_od_long", "freight_tonnage_od_long.csv"),
 ]
+
+ADMIN_DONG_COORDINATE_COLUMNS_SQL = """
+ALTER TABLE admin_dongs
+    ADD COLUMN IF NOT EXISTS representative_lat double precision,
+    ADD COLUMN IF NOT EXISTS representative_lon double precision;
+"""
 
 
 def wait_for_database() -> None:
@@ -82,6 +88,7 @@ def assert_csv_files_exist() -> None:
 def main() -> None:
     assert_csv_files_exist()
     wait_for_database()
+    run_psql(ADMIN_DONG_COORDINATE_COLUMNS_SQL)
     run_psql(
         """
         TRUNCATE
@@ -100,7 +107,7 @@ def main() -> None:
 
     for table_name, filename in TABLES:
         csv_path = CONTAINER_CSV_DIR / filename
-        run_psql(f"\\copy {table_name} FROM '{csv_path}' WITH (FORMAT csv, HEADER true)")
+        run_psql(f"\\copy {table_name} FROM '{csv_path}' WITH (FORMAT csv, HEADER true, NULL '')")
 
 
 if __name__ == "__main__":
