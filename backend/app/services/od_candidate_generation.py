@@ -704,6 +704,7 @@ def build_od_candidates_with_supplemental(
     supplemental_source: str | Path | BinaryIO,
     source_name: str,
     *,
+    include_base_od: bool = True,
     flow_filter_percent: int | None = None,
     top_percent: int | None = None,
     k_values: list[int] | None = None,
@@ -721,7 +722,10 @@ def build_od_candidates_with_supplemental(
             temporary_path = Path(file.name)
             writer = csv.DictWriter(file, fieldnames=STANDARD_OD_COLUMNS)
             writer.writeheader()
-            base_total, base_written, base_coordinate_excluded, base_non_positive = _append_standard_records(source, writer)
+            if include_base_od:
+                base_total, base_written, base_coordinate_excluded, base_non_positive = _append_standard_records(source, writer)
+            else:
+                base_total = base_written = base_coordinate_excluded = base_non_positive = 0
             supplemental_total, supplemental_written, supplemental_coordinate_excluded, supplemental_non_positive = (
                 _append_standard_records(supplemental_source, writer)
             )

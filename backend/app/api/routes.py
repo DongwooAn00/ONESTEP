@@ -49,6 +49,7 @@ async def create_od_candidates(
     edge_limit: int = Form(default=50),
     min_estimated_flow: float | None = Form(default=None),
     sample_size: int | None = Form(default=None),
+    include_base_od: bool = Form(default=True),
     file: bytes | None = File(default=None),
     supplemental_file: bytes | None = File(default=None),
 ) -> ODCandidateResult:
@@ -62,20 +63,26 @@ async def create_od_candidates(
         raise HTTPException(status_code=400, detail="edge_limit must be between 1 and 100.")
     if sample_size is not None and sample_size < 1:
         raise HTTPException(status_code=400, detail="sample_size must be empty or greater than 0.")
+    if not include_base_od and supplemental_file is None:
+        raise HTTPException(status_code=400, detail="Select at least one OD source.")
 
     try:
         base_source = StringIO(file.decode("utf-8-sig")) if file is not None else None
         if supplemental_file is not None:
             supplemental_csv = StringIO(supplemental_file.decode("utf-8-sig"))
-            source_name = (
-                "uploaded_od.csv + scenario_od.csv"
-                if file is not None
-                else "synthetic_admin_dong_od_by_mode.csv + scenario_od.csv"
-            )
+            if include_base_od:
+                source_name = (
+                    "uploaded_od.csv + scenario_od.csv"
+                    if file is not None
+                    else "synthetic_admin_dong_od_by_mode.csv + scenario_od.csv"
+                )
+            else:
+                source_name = "scenario_od.csv"
             return build_od_candidates_with_supplemental(
                 base_source,
                 supplemental_csv,
                 source_name,
+                include_base_od=include_base_od,
                 flow_filter_percent=flow_filter_percent,
                 top_node_limit=top_node_limit,
                 low_impact_prune_percent=low_impact_prune_percent,

@@ -1,5 +1,9 @@
 # ONESTEP
 
+See `docs/geotechnical-tunnel-decision.md` for the MVP tunnel decision update:
+overburden, estimated_rock_class, road grade, and cost comparison are now used
+when available, while the previous slope/local-relief fallback remains active.
+
 도로 터널 건설 사업의 경제성을 분석하는 웹 서비스입니다.
 
 ## 기술 스택

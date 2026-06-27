@@ -74,6 +74,29 @@ def test_build_od_candidates_can_merge_supplemental_scenario_od():
     assert any("2 supplemental rows" in warning for warning in result.stats.warnings)
 
 
+def test_build_od_candidates_can_use_only_supplemental_scenario_od():
+    supplemental = StringIO(
+        "origin_latitude,origin_longitude,destination_latitude,destination_longitude,passenger_car,freight\n"
+        "36.30,127.30,36.80,127.80,10000,2000\n"
+        "36.35,127.35,36.85,127.85,12000,3000\n"
+    )
+
+    result = build_od_candidates_with_supplemental(
+        None,
+        supplemental,
+        "scenario_od.csv",
+        include_base_od=False,
+        low_impact_prune_percent=None,
+        top_node_limit=100,
+        persist_files=False,
+    )
+
+    assert result.nodes
+    assert result.edges
+    assert result.stats.total_od_rows == 2
+    assert result.stats.selected_top_rows == 2
+
+
 def test_build_od_candidates_reports_missing_coordinates(tmp_path):
     csv_path = tmp_path / "od_without_coordinates.csv"
     csv_path.write_text(

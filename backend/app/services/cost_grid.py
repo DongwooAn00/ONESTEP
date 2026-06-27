@@ -34,6 +34,15 @@ class CostCell:
     protected: bool = False
     building: bool = False
     builtup_area: bool = False
+    overburden_m: float | None = None
+    estimated_rock_class: str | None = None
+    rock_class: str | None = None
+    local_relief_m: float | None = None
+    fault_dist_m: float | None = None
+    boundary_dist_m: float | None = None
+    rock_ground_factor: float | None = None
+    rock_constructability: str | None = None
+    risk_reasons: list[str] | None = None
 
     @property
     def is_river(self) -> bool:

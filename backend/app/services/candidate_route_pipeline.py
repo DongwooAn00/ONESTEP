@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import asdict
 from pathlib import Path
 
 from app.schemas.od_candidates import CandidateEdge, CandidateNode
@@ -47,15 +48,7 @@ def _route_geometry(cells) -> list[dict[str, float]]:
 
 def _segment_rows(route_id: str, details: list[RouteSegmentDetail]) -> list[dict]:
     return [
-        {
-            "route_id": route_id,
-            "segment_id": item.segment_id,
-            "segment_type": item.segment_type,
-            "segment_length_km": item.segment_length_km,
-            "segment_geometry": item.segment_geometry,
-            "average_slope": item.average_slope,
-            "max_slope": item.max_slope,
-        }
+        {"route_id": route_id, **asdict(item)}
         for item in details
     ]
 

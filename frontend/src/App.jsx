@@ -179,7 +179,7 @@ function csvCell(value) {
   return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-function buildScenarioOdCsv(scenario) {
+function buildScenarioOdCsv(scenarios) {
   const headers = [
     "od_name",
     "origin_latitude",
@@ -189,17 +189,19 @@ function buildScenarioOdCsv(scenario) {
     "passenger_car",
     "freight",
   ];
-  const rows = (scenario?.ods || [])
-    .filter((od) => od.start && od.end)
-    .map((od) => [
-      od.name,
-      od.start.lat,
-      od.start.lng,
-      od.end.lat,
-      od.end.lng,
-      Number(od.traffic || 0),
-      Number(od.freight || 0),
-    ]);
+  const rows = scenarios.flatMap((scenario) =>
+    (scenario?.ods || [])
+      .filter((od) => od.start && od.end)
+      .map((od) => [
+        `${scenario.name} / ${od.name}`,
+        od.start.lat,
+        od.start.lng,
+        od.end.lat,
+        od.end.lng,
+        Number(od.traffic || 0),
+        Number(od.freight || 0),
+      ])
+  );
 
   return [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
 }
@@ -321,7 +323,9 @@ function RouteMap({
   compact = false,
   candidateNodes = [],
   candidateEdges = [],
-  candidateRouteSegments = []
+  candidateRoutes = [],
+  candidateRouteSegments = [],
+  focusedCandidate = null
 }) {
   const containerRef = useRef(null);
   const mapRef = useRef(null);
@@ -440,6 +444,28 @@ function RouteMap({
       map.setLevel(level);
     };
 
+    const fitPositions = (positions, preferredLevel = 7) => {
+      const coordinates = positions
+        .filter(Boolean)
+        .map((position) => ({ lat: position.getLat(), lon: position.getLng() }));
+      if (!coordinates.length) {
+        return false;
+      }
+
+      const minLat = Math.min(...coordinates.map((point) => point.lat));
+      const maxLat = Math.max(...coordinates.map((point) => point.lat));
+      const minLon = Math.min(...coordinates.map((point) => point.lon));
+      const maxLon = Math.max(...coordinates.map((point) => point.lon));
+      const centerLat = (minLat + maxLat) / 2;
+      const centerLon = (minLon + maxLon) / 2;
+      const maxSpan = Math.max(maxLat - minLat, maxLon - minLon);
+      const level = Math.min(10, Math.max(5, maxSpan > 0.8 ? 9 : maxSpan > 0.35 ? 8 : preferredLevel));
+
+      map.setCenter(new kakao.maps.LatLng(centerLat, centerLon));
+      map.setLevel(level);
+      return true;
+    };
+
     const clearMapItems = () => {
       markersRef.current.forEach((marker) => marker.setMap(null));
       linesRef.current.forEach((line) => line.setMap(null));
@@ -522,6 +548,7 @@ function RouteMap({
         return;
       }
 
+      const isFocusedRoute = focusedCandidate?.type === "route" && focusedCandidate.id === segment.route_id;
       const segmentStyle = {
         surface_road: { color: "#f59e0b", weight: 6, opacity: 0.9, style: "solid" },
         new_surface_road: { color: "#f59e0b", weight: 6, opacity: 0.9, style: "solid" },
@@ -544,9 +571,9 @@ function RouteMap({
       const line = new kakao.maps.Polyline({
         map,
         path,
-        strokeWeight: segmentStyle.weight,
+        strokeWeight: isFocusedRoute ? segmentStyle.weight + 3 : segmentStyle.weight,
         strokeColor: segmentStyle.color,
-        strokeOpacity: segmentStyle.opacity,
+        strokeOpacity: isFocusedRoute ? 1 : segmentStyle.opacity,
         strokeStyle: segmentStyle.style
       });
       linesRef.current.push(line);
@@ -567,12 +594,13 @@ function RouteMap({
           return;
         }
         const path = [fromPosition, toPosition];
+        const isFocusedEdge = focusedCandidate?.type === "edge" && focusedCandidate.id === edge.edge_id;
         const line = new kakao.maps.Polyline({
           map,
           path,
-          strokeWeight: Math.max(3, Math.min(11, 3 + ((Number(edge.estimated_flow) || 0) / maxEdgeFlow) * 8)),
-          strokeColor: "#e5484d",
-          strokeOpacity: edge.rank <= 5 ? 0.92 : 0.62,
+          strokeWeight: isFocusedEdge ? 12 : Math.max(3, Math.min(11, 3 + ((Number(edge.estimated_flow) || 0) / maxEdgeFlow) * 8)),
+          strokeColor: isFocusedEdge ? "#0b7ff3" : "#e5484d",
+          strokeOpacity: isFocusedEdge ? 1 : edge.rank <= 5 ? 0.92 : 0.62,
           strokeStyle: "solid"
         });
         linesRef.current.push(line);
@@ -622,7 +650,29 @@ function RouteMap({
     window.setTimeout(() => {
       try {
         map.relayout();
-        if (hasBounds) {
+        let focused = false;
+        if (focusedCandidate?.type === "edge") {
+          const edge = candidateEdges.find((item) => item.edge_id === focusedCandidate.id);
+          const fromNode = edge ? nodeById.get(edge.from_node_id) : null;
+          const toNode = edge ? nodeById.get(edge.to_node_id) : null;
+          focused = fitPositions([
+            fromNode ? toLatLng(fromNode.latitude, fromNode.longitude) : null,
+            toNode ? toLatLng(toNode.latitude, toNode.longitude) : null
+          ], 7);
+        }
+        if (focusedCandidate?.type === "route") {
+          let positions = candidateRouteSegments
+            .filter((segment) => segment.route_id === focusedCandidate.id)
+            .flatMap((segment) => segment.segment_geometry || [])
+            .map((point) => toLatLng(point.lat, point.lon ?? point.lng ?? point.longitude));
+          if (!positions.length) {
+            const route = candidateRoutes.find((item) => item.route_id === focusedCandidate.id);
+            positions = (route?.route_geometry || [])
+              .map((point) => toLatLng(point.lat, point.lon ?? point.lng ?? point.longitude));
+          }
+          focused = fitPositions(positions, 7);
+        }
+        if (!focused && hasBounds) {
           fitMapToView();
           window.setTimeout(() => map.relayout(), 120);
         }
@@ -635,7 +685,7 @@ function RouteMap({
       setRenderError(error.message || "지도 결과를 그리는 중 오류가 발생했습니다.");
       window.setTimeout(() => map.relayout(), 80);
     }
-  }, [mapReady, routes, draftRoute, candidateNodes, candidateEdges, candidateRouteSegments]);
+  }, [mapReady, routes, draftRoute, candidateNodes, candidateEdges, candidateRoutes, candidateRouteSegments, focusedCandidate]);
 
   useEffect(() => {
     if (!mapReady || !mapRef.current || !containerRef.current) {
@@ -689,10 +739,8 @@ function RouteMap({
 
 function Header({ activePage, onPageChange, onShowGuide }) {
   const pages = [
-    { id: "analysis", label: "기존 페이지", icon: BarChart3 },
-    { id: "od-mvp", label: "OD 후보 생성", icon: Network },
-    { id: "create", label: "시나리오 생성", icon: ListPlus },
-    { id: "community", label: "커뮤니티", icon: MessageSquareText }
+    { id: "analysis", label: "도로/터널 후보군 생성", icon: Network },
+    { id: "create", label: "시나리오 생성", icon: ListPlus }
   ];
 
   return (
@@ -1502,8 +1550,10 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const [analysisStatus, setAnalysisStatus] = useState("idle");
   const [routeStatus, setRouteStatus] = useState("idle");
   const [uploadedFile, setUploadedFile] = useState(null);
-  const [includeScenarioOd, setIncludeScenarioOd] = useState(true);
-  const [supplementalScenarioId, setSupplementalScenarioId] = useState(selectedScenarioId || scenarios[0]?.id || "");
+  const [includeBaseOd, setIncludeBaseOd] = useState(true);
+  const [selectedScenarioIds, setSelectedScenarioIds] = useState(
+    selectedScenarioId ? [selectedScenarioId] : []
+  );
   const [candidateResult, setCandidateResult] = useState(null);
   const [candidateRouteResult, setCandidateRouteResult] = useState(null);
   const [routeLimit, setRouteLimit] = useState(20);
@@ -1513,17 +1563,30 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const [sampleSize, setSampleSize] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [routeErrorMessage, setRouteErrorMessage] = useState("");
-  const supplementalScenario = useMemo(
-    () => scenarios.find((scenario) => scenario.id === supplementalScenarioId) || scenarios[0],
-    [scenarios, supplementalScenarioId]
+  const [focusedCandidate, setFocusedCandidate] = useState(null);
+  const selectedSupplementalScenarios = useMemo(
+    () => scenarios.filter((scenario) => selectedScenarioIds.includes(scenario.id)),
+    [scenarios, selectedScenarioIds]
   );
-  const supplementalOdCount = supplementalScenario?.ods?.length || 0;
+  const supplementalOdCount = selectedSupplementalScenarios.reduce(
+    (total, scenario) => total + (scenario.ods?.length || 0),
+    0
+  );
+  const hasSelectedOdSource = includeBaseOd || supplementalOdCount > 0;
 
   useEffect(() => {
-    if (!supplementalScenarioId && selectedScenarioId) {
-      setSupplementalScenarioId(selectedScenarioId);
+    if (selectedScenarioId) {
+      setSelectedScenarioIds((current) => (current.length ? current : [selectedScenarioId]));
     }
-  }, [selectedScenarioId, supplementalScenarioId]);
+  }, [selectedScenarioId]);
+
+  const toggleScenarioSelection = useCallback((scenarioId) => {
+    setSelectedScenarioIds((current) =>
+      current.includes(scenarioId)
+        ? current.filter((id) => id !== scenarioId)
+        : [...current, scenarioId]
+    );
+  }, []);
 
   const runCandidateGeneration = async () => {
     setAnalysisStatus("loading");
@@ -1532,10 +1595,12 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
     setRouteErrorMessage("");
     setCandidateResult(null);
     setCandidateRouteResult(null);
+    setFocusedCandidate(null);
 
     const formData = new FormData();
     formData.append("top_node_limit", "100");
     formData.append("edge_limit", String(edgeLimit));
+    formData.append("include_base_od", includeBaseOd ? "true" : "false");
     if (flowFilterPercent) {
       formData.append("flow_filter_percent", flowFilterPercent);
     }
@@ -1548,8 +1613,8 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
     if (uploadedFile) {
       formData.append("file", uploadedFile);
     }
-    if (includeScenarioOd && supplementalScenario && supplementalOdCount > 0) {
-      const scenarioCsv = buildScenarioOdCsv(supplementalScenario);
+    if (selectedSupplementalScenarios.length && supplementalOdCount > 0) {
+      const scenarioCsv = buildScenarioOdCsv(selectedSupplementalScenarios);
       const scenarioFile = new File([scenarioCsv], "scenario_od.csv", { type: "text/csv" });
       formData.append("supplemental_file", scenarioFile);
     }
@@ -1581,6 +1646,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
     setRouteStatus("loading");
     setRouteErrorMessage("");
     setCandidateRouteResult(null);
+    setFocusedCandidate(null);
 
     try {
       const response = await fetch(`${API_BASE_URL}/api/candidate-routes`, {
@@ -1607,6 +1673,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const nodes = candidateResult?.nodes || [];
   const edges = candidateResult?.edges || [];
   const stats = candidateResult?.stats;
+  const candidateRoutes = candidateRouteResult?.routes || [];
   const routeSegments = candidateRouteResult?.segments || [];
   const rankedRoutes = candidateRouteResult?.ranked_routes || [];
   const routeCosts = candidateRouteResult?.costs || [];
@@ -1632,36 +1699,55 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
         </label>
 
         <div className="analysis-options candidate-options">
-          <label className="plain-field">
-            <span>추가 OD 시나리오</span>
-            <select
-              value={supplementalScenario?.id || ""}
-              onChange={(event) => setSupplementalScenarioId(event.target.value)}
-              disabled={!scenarios.length}
-            >
+          <div className="od-folder-tree">
+            <div className="tree-root">
+              <Network size={15} />
+              <div className="tree-root-copy">
+                <strong>OD 데이터 선택</strong>
+                <small>후보군 생성에 사용할 OD 소스를 선택하세요</small>
+              </div>
+            </div>
+            <label className={`tree-node ${includeBaseOd ? "selected" : ""}`}>
+              <input
+                type="checkbox"
+                checked={includeBaseOd}
+                onChange={(event) => setIncludeBaseOd(event.target.checked)}
+              />
+              <span className="tree-node-icon">B</span>
+              <span className="tree-node-readable">
+                <strong>기본 OD</strong>
+                <small>{uploadedFile ? uploadedFile.name : "프로젝트 기본 OD CSV"}</small>
+              </span>
+              <span className="tree-badge">{includeBaseOd ? "포함" : "제외"}</span>
+            </label>
+            <div className="tree-group">
+              <div className="tree-group-label">
+                <span className="tree-branch" />
+                <span>OD 시나리오</span>
+              </div>
               {scenarios.map((scenario) => (
-                <option key={scenario.id} value={scenario.id}>
-                  {scenario.name}
-                </option>
+                <label
+                  className={`tree-node child ${selectedScenarioIds.includes(scenario.id) ? "selected" : ""}`}
+                  key={scenario.id}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedScenarioIds.includes(scenario.id)}
+                    onChange={() => toggleScenarioSelection(scenario.id)}
+                  />
+                  <span className="tree-node-icon">OD</span>
+                  <span className="tree-node-readable">
+                    <strong>{scenario.name}</strong>
+                    <small>{scenario.source || "사용자 생성"} · {formatNumber(scenario.ods?.length || 0)}개 OD</small>
+                  </span>
+                  <span className="tree-badge">{selectedScenarioIds.includes(scenario.id) ? "선택됨" : "미선택"}</span>
+                </label>
               ))}
-            </select>
-          </label>
-          <label className="checkbox-field">
-            <input
-              type="checkbox"
-              checked={includeScenarioOd}
-              onChange={(event) => setIncludeScenarioOd(event.target.checked)}
-              disabled={!supplementalOdCount}
-            />
-            <span>기존 OD에 선택 시나리오 OD {formatNumber(supplementalOdCount)}개 더하기</span>
-          </label>
-        </div>
-
-        <div className="analysis-rule-list">
-          <span>전체 OD 기본 사용</span>
-          <span>K=10, 20, 30, 50 반복</span>
-          <span>3km 이내 후보 정점 병합</span>
-          <span>하위 20% 영향 정점 제거</span>
+            </div>
+            <p className="tree-summary-readable">
+              기본 OD {includeBaseOd ? "포함" : "제외"} · 추가 OD {formatNumber(supplementalOdCount)}개 선택
+            </p>
+          </div>
         </div>
 
         <div className="analysis-options candidate-options">
@@ -1701,7 +1787,12 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
           </label>
         </div>
 
-        <button className="primary-action" type="button" onClick={runCandidateGeneration} disabled={analysisStatus === "loading"}>
+        <button
+          className="primary-action"
+          type="button"
+          onClick={runCandidateGeneration}
+          disabled={analysisStatus === "loading" || !hasSelectedOdSource}
+        >
           <Play size={18} fill="currentColor" />
           {analysisStatus === "loading" ? "후보 생성 중" : "후보 생성 실행"}
         </button>
@@ -1714,8 +1805,11 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
           <label className="plain-field">
             <span>노선 탐색 후보 수</span>
             <select value={routeLimit} onChange={(event) => setRouteLimit(Number(event.target.value))}>
+              <option value={5}>상위 5개</option>
               <option value={10}>상위 10개</option>
+              <option value={15}>상위 15개</option>
               <option value={20}>상위 20개</option>
+              <option value={30}>상위 30개</option>
               <option value={50}>상위 50개</option>
             </select>
           </label>
@@ -1750,7 +1844,9 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
             routes={[]}
             candidateNodes={nodes}
             candidateEdges={edges}
+            candidateRoutes={candidateRoutes}
             candidateRouteSegments={routeSegments}
+            focusedCandidate={focusedCandidate}
             helperText={{
               title: stats?.source_name || "OD CSV를 선택하세요",
               body: edges.length
@@ -1949,7 +2045,21 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
               {candidateRouteResult ? rankedRoutes.map((route) => {
                 const cost = costByRouteId.get(route.route_id);
                 return (
-                  <article className="edge-card ranked-route-card" key={route.route_id}>
+                  <article
+                    className={`edge-card ranked-route-card ${
+                      focusedCandidate?.type === "route" && focusedCandidate.id === route.route_id ? "active" : ""
+                    }`}
+                    key={route.route_id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setFocusedCandidate({ type: "route", id: route.route_id })}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setFocusedCandidate({ type: "route", id: route.route_id });
+                      }
+                    }}
+                  >
                     <header>
                       <strong>#{route.rank} {route.from_node_id} → {route.to_node_id}</strong>
                       <small>{route.summary.status}</small>
@@ -1973,7 +2083,21 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
                   </article>
                 );
               }) : edges.map((edge) => (
-                <article className="edge-card" key={edge.edge_id}>
+                <article
+                  className={`edge-card ${
+                    focusedCandidate?.type === "edge" && focusedCandidate.id === edge.edge_id ? "active" : ""
+                  }`}
+                  key={edge.edge_id}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setFocusedCandidate({ type: "edge", id: edge.edge_id })}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      setFocusedCandidate({ type: "edge", id: edge.edge_id });
+                    }
+                  }}
+                >
                   <header>
                     <strong>#{edge.rank} {edge.from_node_id} → {edge.to_node_id}</strong>
                     <small>{edge.edge_id}</small>
@@ -1999,7 +2123,6 @@ function App() {
   const [showGuide, setShowGuide] = useState(false);
   const [scenarios, setScenarios] = useState(sampleScenarios);
   const [selectedScenarioId, setSelectedScenarioId] = useState(sampleScenarios[0].id);
-  const [communityPosts, setCommunityPosts] = useState(initialCommunityPosts);
 
   const selectedScenario = scenarios.find((scenario) => scenario.id === selectedScenarioId) || scenarios[0];
 
@@ -2016,41 +2139,16 @@ function App() {
     [addScenario]
   );
 
-  const handleCreatePost = useCallback((post) => {
-    setCommunityPosts((current) => [post, ...current]);
-  }, []);
-
-  const handleLikePost = useCallback((postId) => {
-    setCommunityPosts((current) =>
-      current.map((post) => (post.id === postId ? { ...post, likes: post.likes + 1 } : post))
-    );
-  }, []);
-
   return (
     <main className="prototype-shell">
       <Header activePage={activePage} onPageChange={setActivePage} onShowGuide={() => setShowGuide(true)} />
       {showGuide && <GuideDialog onClose={() => setShowGuide(false)} />}
 
       {activePage === "analysis" && (
-        <AnalysisPage
-          scenarios={scenarios}
-          selectedScenario={selectedScenario}
-          selectedScenarioId={selectedScenarioId}
-          onSelectScenario={setSelectedScenarioId}
-          onImportScenario={addScenario}
-          onGoCreate={() => setActivePage("create")}
-        />
-      )}
-
-      {activePage === "od-mvp" && (
         <AnalysisMvpPage scenarios={scenarios} selectedScenarioId={selectedScenarioId} />
       )}
 
       {activePage === "create" && <ScenarioCreatePage onSaveScenario={handleSaveScenario} />}
-
-      {activePage === "community" && (
-        <CommunityPage posts={communityPosts} onCreatePost={handleCreatePost} onLikePost={handleLikePost} />
-      )}
     </main>
   );
 }

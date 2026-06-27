@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from app.services import route_mvp_config as config
+from app.services.geotechnical_model import get_rock_class_factor, normalize_rock_class
 
 
 @dataclass(frozen=True)
@@ -19,7 +20,18 @@ class CostAssumptions:
 
 
 def getGroundFactorByGeology(route_segment, geology_data) -> float:
-    # TODO: Replace this MVP fallback with geology and ground-structure interpretation.
+    rock_class = None
+    if route_segment is not None:
+        rock_class = getattr(route_segment, "rock_class", None) or getattr(route_segment, "estimated_rock_class", None)
+    if geology_data is not None:
+        if isinstance(geology_data, dict):
+            rock_class = rock_class or geology_data.get("rock_class") or geology_data.get("estimated_rock_class")
+        else:
+            rock_class = rock_class or getattr(geology_data, "rock_class", None) or getattr(geology_data, "estimated_rock_class", None)
+    normalized = normalize_rock_class(rock_class)
+    if normalized != "unknown":
+        return get_rock_class_factor(normalized)
+
     if geology_data is None:
         return config.DEFAULT_GROUND_FACTOR
 

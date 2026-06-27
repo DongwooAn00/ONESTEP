@@ -726,19 +726,199 @@ button {
   accent-color: #2b8cf0;
 }
 
-.analysis-rule-list {
+.od-folder-tree {
+  grid-column: 1 / -1;
   display: grid;
-  gap: 8px;
-  margin: 16px 0 12px;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid #cfe0ee;
+  border-radius: 8px;
+  border-color: #cfe0ee;
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
-.analysis-rule-list span {
+.tree-root {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 2px 2px 8px;
+  border-bottom: 1px solid #e3edf5;
+}
+
+.tree-root > strong {
+  display: none;
+}
+
+.tree-root svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #2b8cf0;
+}
+
+.tree-root-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.tree-root-copy strong {
+  color: #17283a;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.tree-root-copy small {
+  color: #6a7f93;
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.tree-node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: 50px;
+  gap: 10px;
   padding: 9px 10px;
-  border: 1px solid #dbe6ef;
+  border: 1px solid transparent;
+  background: #ffffff;
+  box-shadow: 0 1px 2px rgba(31, 48, 66, 0.04);
+}
+
+.tree-node:hover {
+  border-color: #c5dcf2;
+  background: #f4f9ff;
+}
+
+.tree-node.selected {
+  border-color: #7bb8f3;
+  background: #edf6ff;
+  box-shadow: 0 8px 18px rgba(43, 140, 240, 0.12);
+}
+
+.tree-node input {
+  flex: 0 0 auto;
+}
+
+.tree-node > span:not([class]) {
+  display: none;
+}
+
+.tree-node-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #e9f3ff;
+  color: #1d6fc2;
+  font-size: 11px;
+  font-weight: 950;
+}
+
+.tree-node.selected .tree-node-icon {
+  background: #2b8cf0;
+  color: #ffffff;
+}
+
+.tree-node-readable {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  flex: 1 1 auto;
+}
+
+.tree-node-readable strong {
+  overflow: hidden;
+  color: #17283a;
+  font-size: 13px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-node-readable small {
+  overflow: hidden;
+  color: #687f95;
+  font-size: 11px;
+  font-weight: 760;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-badge {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: #eef3f8;
+  color: #51677d;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.tree-node.selected .tree-badge {
+  background: #d9ebff;
+  color: #1769bd;
+}
+
+.tree-group {
+  display: grid;
+  gap: 6px;
+}
+
+.tree-group-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 4px 2px;
+  color: #40566c;
+}
+
+.tree-group-label .tree-branch {
+  display: none;
+}
+
+.tree-node.child {
+  margin-left: 0;
+}
+
+.tree-node.child::before {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: -7px;
+  width: 1px;
+  height: 7px;
+  background: #c6d6e5;
+}
+
+.tree-node.child::after {
+  content: "";
+  position: absolute;
+  left: 17px;
+  top: 50%;
+  width: 10px;
+  height: 1px;
+  background: #c6d6e5;
+}
+
+.tree-branch {
+  display: none;
+}
+
+.tree-summary {
+  display: none;
+}
+
+.tree-summary-readable {
+  margin: 0;
+  padding: 9px 10px;
   border-radius: 7px;
-  background: #f7fafc;
-  color: #293a4c;
-  font-size: 12px;
+  background: #f0f6fc;
+  color: #40566c;
+  font-size: 11px;
   font-weight: 850;
 }
 
@@ -808,6 +988,23 @@ button:disabled {
   border: 1px solid #dbe6ef;
   border-radius: 8px;
   background: #ffffff;
+  cursor: pointer;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease, background 140ms ease;
+}
+
+.edge-card:hover,
+.edge-card:focus-visible {
+  border-color: #8fc2f5;
+  background: #f6fbff;
+  box-shadow: 0 8px 20px rgba(43, 140, 240, 0.12);
+  outline: 0;
+  transform: translateY(-1px);
+}
+
+.edge-card.active {
+  border-color: #2b8cf0;
+  background: #eef7ff;
+  box-shadow: 0 10px 24px rgba(43, 140, 240, 0.18);
 }
 
 .edge-card header {
@@ -1272,6 +1469,10 @@ button:disabled {
   gap: 5px;
   padding-left: 38px;
   counter-increment: guide-step;
+}
+
+.guide-steps li:nth-child(4) {
+  display: none;
 }
 
 .guide-steps li::before {

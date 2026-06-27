@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from app.db import connect
 from app.schemas.od_candidates import CandidateEdge, CandidateNode
 from app.services import route_mvp_config as config
+from app.services.cost_grid import dem_to_lon_lat, lon_lat_to_dem
 from app.services.road_network import RoadAccessPoint, nearest_road_node, to_coordinate, to_road_point
 
 
@@ -253,10 +254,112 @@ def _geometry_to_lat_lon(points: list[tuple[float, float]]) -> list[dict[str, fl
 
 
 def _access_geometry(node: CandidateNode, access: RoadAccessPoint) -> list[dict[str, float]]:
-    return [
+    direct_geometry = [
         {"lat": node.latitude, "lon": node.longitude},
         {"lat": access.coordinate.lat, "lon": access.coordinate.lon},
     ]
+    return _detour_access_geometry_around_buildings(direct_geometry)
+
+
+def _table_exists(table_name: str) -> bool:
+    try:
+        with connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT to_regclass(%s);", (table_name,))
+                row = cursor.fetchone()
+                return bool(row and row[0])
+    except Exception:
+        return False
+
+
+def _point_distance(a: tuple[float, float], b: tuple[float, float]) -> float:
+    return math.hypot(a[0] - b[0], a[1] - b[1])
+
+
+def _corner_walk(corners: list[tuple[float, float]], start: tuple[float, float], end: tuple[float, float]) -> list[tuple[float, float]]:
+    start_index = min(range(len(corners)), key=lambda index: _point_distance(start, corners[index]))
+    end_index = min(range(len(corners)), key=lambda index: _point_distance(end, corners[index]))
+
+    def walk(step: int) -> list[tuple[float, float]]:
+        indexes = [start_index]
+        current = start_index
+        while current != end_index:
+            current = (current + step) % len(corners)
+            indexes.append(current)
+            if len(indexes) > len(corners) + 1:
+                break
+        if start_index == end_index:
+            indexes = [start_index, (start_index + step) % len(corners), (start_index + step * 2) % len(corners)]
+        return [corners[index] for index in indexes]
+
+    candidates = [walk(1), walk(-1)]
+    return min(
+        candidates,
+        key=lambda path: (
+            _point_distance(start, path[0])
+            + sum(_point_distance(a, b) for a, b in zip(path, path[1:]))
+            + _point_distance(path[-1], end)
+        ),
+    )
+
+
+def _detour_access_geometry_around_buildings(geometry: list[dict[str, float]]) -> list[dict[str, float]]:
+    if len(geometry) < 2 or not _table_exists("building_footprints"):
+        return geometry
+
+    start_dem = lon_lat_to_dem(geometry[0]["lon"], geometry[0]["lat"])
+    end_dem = lon_lat_to_dem(geometry[-1]["lon"], geometry[-1]["lat"])
+    try:
+        with connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    WITH access_line AS (
+                        SELECT ST_SetSRID(ST_MakeLine(
+                            ST_MakePoint(%s, %s),
+                            ST_MakePoint(%s, %s)
+                        ), 100002) AS geom
+                    ),
+                    hit_buildings AS (
+                        SELECT ST_Union(building_footprints.geom) AS geom
+                        FROM building_footprints, access_line
+                        WHERE ST_Intersects(building_footprints.geom, access_line.geom)
+                    ),
+                    detour_box AS (
+                        SELECT ST_Expand(ST_Envelope(geom), %s) AS geom
+                        FROM hit_buildings
+                        WHERE geom IS NOT NULL
+                    )
+                    SELECT
+                        ST_XMin(geom),
+                        ST_YMin(geom),
+                        ST_XMax(geom),
+                        ST_YMax(geom)
+                    FROM detour_box;
+                    """,
+                    (start_dem.x, start_dem.y, end_dem.x, end_dem.y, config.BUILDING_BUFFER_M),
+                )
+                row = cursor.fetchone()
+    except Exception:
+        return geometry
+
+    if not row:
+        return geometry
+
+    min_x, min_y, max_x, max_y = (float(value) for value in row)
+    corners = [
+        (min_x, min_y),
+        (min_x, max_y),
+        (max_x, max_y),
+        (max_x, min_y),
+    ]
+    detour_points = _corner_walk(corners, (start_dem.x, start_dem.y), (end_dem.x, end_dem.y))
+    detour_geometry = [geometry[0]]
+    for x, y in detour_points:
+        lon, lat = dem_to_lon_lat(x, y)
+        detour_geometry.append({"lat": lat, "lon": lon})
+    detour_geometry.append(geometry[-1])
+    return detour_geometry
 
 
 def _segment_length_km_from_geometry(points: list[dict[str, float]]) -> float:

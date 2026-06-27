@@ -215,11 +215,35 @@ def _normalize_building_layers() -> None:
         SELECT source_id, name, area_type, geom
         FROM building_footprints;
 
+        DROP TABLE IF EXISTS building_avoidance_vertices;
+        CREATE TABLE building_avoidance_vertices AS
+        WITH dumped AS (
+            SELECT
+                source_id,
+                (ST_Dump(geom)).geom::geometry(Polygon, {DEM_SRID}) AS geom
+            FROM building_footprints
+        ),
+        points AS (
+            SELECT
+                source_id,
+                dumped_point.path AS point_path,
+                dumped_point.geom::geometry(Point, {DEM_SRID}) AS geom
+            FROM dumped
+            CROSS JOIN LATERAL ST_DumpPoints(ST_ExteriorRing(geom)) AS dumped_point
+        )
+        SELECT
+            source_id,
+            ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY point_path) AS vertex_index,
+            geom
+        FROM points;
+
         CREATE INDEX IF NOT EXISTS idx_building_footprints_geom ON building_footprints USING gist(geom);
         CREATE INDEX IF NOT EXISTS idx_builtup_areas_geom ON builtup_areas USING gist(geom);
+        CREATE INDEX IF NOT EXISTS idx_building_avoidance_vertices_geom ON building_avoidance_vertices USING gist(geom);
 
         ANALYZE building_footprints;
         ANALYZE builtup_areas;
+        ANALYZE building_avoidance_vertices;
         """
     )
 
