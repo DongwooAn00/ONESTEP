@@ -121,11 +121,26 @@ def fetch_individual_land_prices(
 
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:
-            body = response.read().decode("utf-8")
+            raw_body = response.read()
+            charset = response.headers.get_content_charset()
     except urllib.error.HTTPError as error:
         raise VWorldRequestError(f"VWorld API HTTP 오류: {error.code}") from error
     except urllib.error.URLError as error:
         raise VWorldRequestError(f"VWorld API 요청 실패: {error.reason}") from error
+
+    body = None
+    encodings = [charset] if charset else []
+    encodings.extend(["utf-8", "cp949", "euc-kr"])
+    for encoding in encodings:
+        if not encoding:
+            continue
+        try:
+            body = raw_body.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if body is None:
+        body = raw_body.decode("utf-8", errors="replace")
 
     if normalized_format == "json":
         return json.loads(body)
