@@ -7,11 +7,24 @@ from app.schemas.economic import AnalysisRequest, AnalysisResult
 from app.schemas.od_candidates import ODCandidateResult
 from app.schemas.route_cost import EvaluateRouteRequest, EvaluateRouteResult, RouteCostRequest, RouteCostResult
 from app.schemas.route_generation import RouteGenerationRequest, RouteGenerationResult
+from app.schemas.vworld_land_price import (
+    LandPriceRequest,
+    LandPriceResult,
+    LegalDongCodeResult,
+    LegalDongLandPriceRequest,
+)
 from app.services.candidate_route_pipeline import build_candidate_routes
 from app.services.economic_analysis import analyze_project
+from app.services.legal_dong_code import list_legal_dong_codes
 from app.services.od_candidate_generation import build_od_candidates, build_od_candidates_with_supplemental
 from app.services.route_cost import analyze_route_cost, evaluate_route
 from app.services.route_generation import generate_route_candidates
+from app.services.vworld_land_price import (
+    VWorldConfigError,
+    VWorldRequestError,
+    fetch_individual_land_prices,
+    fetch_individual_land_prices_by_legal_dong,
+)
 
 router = APIRouter()
 
@@ -39,6 +52,63 @@ def create_route_generation(payload: RouteGenerationRequest) -> RouteGenerationR
 @router.post("/candidate-routes", response_model=CandidateRouteResult)
 def create_candidate_routes(payload: CandidateRouteRequest) -> CandidateRouteResult:
     return build_candidate_routes(payload.nodes, payload.edges, route_limit=payload.route_limit)
+
+
+@router.get("/legal-dong-codes", response_model=LegalDongCodeResult)
+def get_legal_dong_codes(req_lvl: int, ld_code: str = "") -> LegalDongCodeResult:
+    try:
+        return LegalDongCodeResult(items=list_legal_dong_codes(req_lvl, ld_code))
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.post("/land-prices", response_model=LandPriceResult)
+def create_land_price_lookup(payload: LandPriceRequest) -> LandPriceResult:
+    try:
+        data = fetch_individual_land_prices(
+            stdr_year=payload.stdr_year,
+            req_lvl=payload.req_lvl,
+            ld_code=payload.ld_code,
+            page_no=payload.page_no,
+            num_of_rows=payload.num_of_rows,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except VWorldConfigError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldRequestError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="VWorld API JSON 응답을 파싱하지 못했습니다.")
+    return LandPriceResult(data=data)
+
+
+@router.post("/land-prices/by-legal-dong", response_model=LandPriceResult)
+def create_land_price_lookup_by_legal_dong(payload: LegalDongLandPriceRequest) -> LandPriceResult:
+    try:
+        data = fetch_individual_land_prices_by_legal_dong(
+            stdr_year=payload.stdr_year,
+            req_lvl=payload.req_lvl,
+            legal_dong_code=payload.legal_dong_code,
+            legal_dong_name=payload.legal_dong_name,
+            page_no=payload.page_no,
+            num_of_rows=payload.num_of_rows,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldConfigError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldRequestError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="VWorld API JSON 응답을 파싱하지 못했습니다.")
+    return LandPriceResult(data=data)
 
 
 @router.post("/od-candidates", response_model=ODCandidateResult)
