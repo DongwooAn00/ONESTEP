@@ -10,6 +10,7 @@ from app.schemas.route_generation import RouteGenerationRequest, RouteGeneration
 from app.schemas.vworld_land_price import (
     LandPriceRequest,
     LandPriceResult,
+    LandPriceSummaryResult,
     LegalDongCodeResult,
     LegalDongLandPriceRequest,
 )
@@ -24,6 +25,8 @@ from app.services.vworld_land_price import (
     VWorldRequestError,
     fetch_individual_land_prices,
     fetch_individual_land_prices_by_legal_dong,
+    fetch_land_price_summary,
+    fetch_land_price_summary_by_legal_dong,
 )
 
 router = APIRouter()
@@ -109,6 +112,45 @@ def create_land_price_lookup_by_legal_dong(payload: LegalDongLandPriceRequest) -
     if not isinstance(data, dict):
         raise HTTPException(status_code=502, detail="VWorld API JSON 응답을 파싱하지 못했습니다.")
     return LandPriceResult(data=data)
+
+
+@router.post("/land-prices/summary", response_model=LandPriceSummaryResult)
+def create_land_price_summary(payload: LandPriceRequest) -> LandPriceSummaryResult:
+    try:
+        summary = fetch_land_price_summary(
+            stdr_year=payload.stdr_year,
+            req_lvl=payload.req_lvl,
+            ld_code=payload.ld_code,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except VWorldConfigError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldRequestError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    return LandPriceSummaryResult(summary=summary)
+
+
+@router.post("/land-prices/summary/by-legal-dong", response_model=LandPriceSummaryResult)
+def create_land_price_summary_by_legal_dong(payload: LegalDongLandPriceRequest) -> LandPriceSummaryResult:
+    try:
+        summary = fetch_land_price_summary_by_legal_dong(
+            stdr_year=payload.stdr_year,
+            req_lvl=payload.req_lvl,
+            legal_dong_code=payload.legal_dong_code,
+            legal_dong_name=payload.legal_dong_name,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldConfigError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldRequestError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    return LandPriceSummaryResult(summary=summary)
 
 
 @router.post("/od-candidates", response_model=ODCandidateResult)

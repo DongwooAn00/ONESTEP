@@ -29,3 +29,22 @@ class LegalDongLandPriceRequest(BaseModel):
 
 class LandPriceResult(BaseModel):
     data: dict
+
+
+class LandPriceSummary(BaseModel):
+    stdr_year: int
+    req_lvl: int
+    ld_code: str
+    ld_code_name: str | None = None
+    total_count: int
+    used_count: int
+    skipped_count: int
+    total_area_sqm: float
+    weighted_average_price_krw_per_sqm: float | None = None
+    simple_average_price_krw_per_sqm: float | None = None
+    min_price_krw_per_sqm: float | None = None
+    max_price_krw_per_sqm: float | None = None
+
+
+class LandPriceSummaryResult(BaseModel):
+    summary: LandPriceSummary

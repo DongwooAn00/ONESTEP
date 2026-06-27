@@ -7,6 +7,7 @@ from app.services.vworld_land_price import (
     fetch_individual_land_prices,
     fetch_individual_land_prices_by_legal_dong,
     resolve_vworld_ld_code,
+    summarize_land_price_fields,
 )
 
 
@@ -19,6 +20,12 @@ class _FakeResponse:
 
     def read(self):
         return json.dumps({"response": {"status": "OK"}}).encode("utf-8")
+
+    class _Headers:
+        def get_content_charset(self):
+            return "utf-8"
+
+    headers = _Headers()
 
 
 def test_list_legal_dong_codes_returns_sido_rows():
@@ -91,3 +98,37 @@ def test_fetch_individual_land_prices_by_legal_dong_builds_vworld_request(monkey
     assert result == {"response": {"status": "OK"}}
     assert "reqLvl=2" in captured["url"]
     assert "ldCode=47930" in captured["url"]
+
+
+def test_summarize_land_price_fields_uses_area_weighted_average():
+    summary = summarize_land_price_fields(
+        stdr_year=2022,
+        req_lvl=3,
+        ld_code="1111010100",
+        total_count=3,
+        fields=[
+            {
+                "ldCodeNm": "서울특별시 종로구 청운동",
+                "ladPblntfPclnd": "100",
+                "ladAr": "10",
+            },
+            {
+                "ldCodeNm": "서울특별시 종로구 청운동",
+                "ladPblntfPclnd": "200",
+                "ladAr": "30",
+            },
+            {
+                "ldCodeNm": "서울특별시 종로구 청운동",
+                "ladPblntfPclnd": "",
+                "ladAr": "20",
+            },
+        ],
+    )
+
+    assert summary["ld_code_name"] == "서울특별시 종로구 청운동"
+    assert summary["total_count"] == 3
+    assert summary["used_count"] == 2
+    assert summary["skipped_count"] == 1
+    assert summary["total_area_sqm"] == 40
+    assert summary["weighted_average_price_krw_per_sqm"] == 175
+    assert summary["simple_average_price_krw_per_sqm"] == 150
