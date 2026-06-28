@@ -1589,7 +1589,7 @@ function ScenarioCreatePage({ onSaveScenario }) {
         </button>
         <button className="finish-action" type="button" onClick={finishScenario}>
           <Save size={18} />
-          시나리오 종료
+          시나리오 저장
         </button>
 
         {message && <p className="status-text">{message}</p>}
@@ -2115,8 +2115,11 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
         <div className="analysis-options region-filter-options">
           <div className="region-filter-heading">
             <div>
-              <strong>계산 구역 선택</strong>
-              <small>선택 구역과 경계 여유 범위의 데이터만 계산합니다.</small>
+              <strong>
+                <MapPin size={16} />
+                계산 구역 선택
+              </strong>
+              <small>구역을 선택하지 않으면 전체 범위로 계산합니다.</small>
             </div>
             <label className="region-all-toggle">
               <input
@@ -2158,9 +2161,6 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
               <small>km</small>
             </div>
           </label>
-          {!useAllRegions && !selectedRegions.length && (
-            <p className="status-text">구역을 선택하지 않으면 기존처럼 전체 범위로 계산합니다.</p>
-          )}
         </div>
 
         <div className="analysis-options candidate-options">

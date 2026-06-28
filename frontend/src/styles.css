@@ -555,6 +555,17 @@ button {
   height: 100%;
 }
 
+.live-map div:has(button[title="지도"]),
+.live-map div:has(button[title="스카이뷰"]) {
+  margin-top: 6px !important;
+  transform: translateX(-8px);
+}
+
+.live-map div:has(button[title="확대"]),
+.live-map div:has(button[title="축소"]) {
+  transform: translate(-8px, 10px);
+}
+
 .map-toolbar {
   position: absolute;
   z-index: 3;
@@ -1126,6 +1137,16 @@ button {
 .region-filter-heading > div {
   display: grid;
   gap: 3px;
+}
+
+.region-filter-heading strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.region-filter-heading strong svg {
+  color: #0878ec;
 }
 
 .scenario-panel .region-filter-heading > div {
