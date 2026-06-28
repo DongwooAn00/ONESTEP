@@ -423,14 +423,14 @@ button {
 
 .dashboard {
   display: grid;
-  grid-template-columns: minmax(260px, 310px) minmax(580px, 1fr) minmax(300px, 370px);
+  grid-template-columns: minmax(300px, 0.9fr) minmax(540px, 1.35fr) minmax(330px, 1fr);
   gap: 14px;
   min-height: calc(100vh - 68px);
   padding: 14px;
 }
 
 .dashboard-idle {
-  grid-template-columns: minmax(260px, 310px) minmax(650px, 1fr) minmax(230px, 280px);
+  grid-template-columns: minmax(300px, 0.9fr) minmax(580px, 1.4fr) minmax(300px, 0.9fr);
 }
 
 .input-panel,
@@ -2071,7 +2071,7 @@ button:disabled {
 @media (max-width: 1180px) {
   .dashboard,
   .dashboard-idle {
-    grid-template-columns: 290px minmax(0, 1fr);
+    grid-template-columns: 320px minmax(0, 1fr);
   }
 
   .result-panel {
