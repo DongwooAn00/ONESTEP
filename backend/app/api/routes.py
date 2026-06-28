@@ -7,9 +7,7 @@ from app.schemas.economic import AnalysisRequest, AnalysisResult
 from app.schemas.od_candidates import ODCandidateResult
 from app.schemas.route_cost import EvaluateRouteRequest, EvaluateRouteResult, RouteCostRequest, RouteCostResult
 from app.schemas.route_generation import RouteGenerationRequest, RouteGenerationResult
-<<<<<<< HEAD
 from app.schemas.route_reports import CandidateRouteReportsRequest, CandidateRouteReportsResult
-=======
 from app.schemas.vworld_land_price import (
     LandPriceRequest,
     LandPriceResult,
@@ -17,16 +15,13 @@ from app.schemas.vworld_land_price import (
     LegalDongCodeResult,
     LegalDongLandPriceRequest,
 )
->>>>>>> 2759c0f66d0ef022f7d0f892afee68f370dee2cd
 from app.services.candidate_route_pipeline import build_candidate_routes
 from app.services.economic_analysis import analyze_project
 from app.services.legal_dong_code import list_legal_dong_codes
 from app.services.od_candidate_generation import build_od_candidates, build_od_candidates_with_supplemental
 from app.services.route_cost import analyze_route_cost, evaluate_route
 from app.services.route_generation import generate_route_candidates
-<<<<<<< HEAD
 from app.services.route_report_service import generate_candidate_route_reports
-=======
 from app.services.vworld_land_price import (
     VWorldConfigError,
     VWorldRequestError,
@@ -35,7 +30,6 @@ from app.services.vworld_land_price import (
     fetch_land_price_summary,
     fetch_land_price_summary_by_legal_dong,
 )
->>>>>>> 2759c0f66d0ef022f7d0f892afee68f370dee2cd
 
 router = APIRouter()
 
