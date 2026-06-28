@@ -1250,6 +1250,7 @@ function AnalysisPage({
         </section>
       </section>
 
+      {analysisStatus !== "idle" && (
       <aside className="result-panel">
         {analysisStatus === "idle" ? (
           <div className="result-empty">
@@ -1280,12 +1281,14 @@ function AnalysisPage({
           </>
         )}
       </aside>
+      )}
     </section>
   );
 }
 
 function ScenarioCreatePage({ onSaveScenario }) {
   const [scenarioName, setScenarioName] = useState("새 OD 시나리오");
+  const [createPanelWidth, setCreatePanelWidth] = useState(520);
   const [draftOds, setDraftOds] = useState([]);
   const [draftPointStep, setDraftPointStep] = useState("start");
   const [draftStart, setDraftStart] = useState(null);
@@ -1296,6 +1299,27 @@ function ScenarioCreatePage({ onSaveScenario }) {
     end: { query: "", results: [], message: "" }
   });
   const [message, setMessage] = useState("");
+
+  const startCreatePanelResize = useCallback((event) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = createPanelWidth;
+
+    const handlePointerMove = (moveEvent) => {
+      const nextWidth = Math.min(560, Math.max(300, startWidth + moveEvent.clientX - startX));
+      setCreatePanelWidth(nextWidth);
+    };
+
+    const handlePointerUp = () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+      document.body.classList.remove("column-resizing");
+    };
+
+    document.body.classList.add("column-resizing");
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp);
+  }, [createPanelWidth]);
 
   const handleSelectPoint = useCallback(
     (point) => {
@@ -1309,7 +1333,7 @@ function ScenarioCreatePage({ onSaveScenario }) {
 
       setDraftEnd(point);
       setDraftPointStep("start");
-      setMessage("OD 정보 입력 후 시나리오 추가 버튼을 누르세요.");
+      setMessage("OD 정보를 입력한 뒤 시나리오 추가 버튼을 누르세요.");
     },
     [draftPointStep]
   );
@@ -1409,7 +1433,7 @@ function ScenarioCreatePage({ onSaveScenario }) {
     } else {
       setDraftEnd(point);
       setDraftPointStep("start");
-      setMessage("OD 정보 입력 후 시나리오 추가 버튼을 누르세요.");
+      setMessage("OD 정보를 입력한 뒤 시나리오 추가 버튼을 누르세요.");
     }
 
     setLocationSearch((current) => ({
@@ -1480,19 +1504,10 @@ function ScenarioCreatePage({ onSaveScenario }) {
   }));
 
   return (
-    <section className="create-page">
-      <section className="creator-map" aria-label="시나리오 생성 지도">
-        <RouteMap
-          routes={savedRoutes}
-          draftRoute={draftRoute}
-          onSelectPoint={handleSelectPoint}
-          helperText={{
-            title: draftPointStep === "start" ? "시작지점 선택" : "종료지점 선택",
-            body: "지도를 클릭해 OD의 시작과 종료 좌표를 지정합니다."
-          }}
-        />
-      </section>
-
+    <section
+      className="create-page"
+      style={{ "--create-panel-width": `${createPanelWidth}px` }}
+    >
       <aside className="creator-panel">
         <h2>
           <ListPlus size={19} />
@@ -1597,10 +1612,29 @@ function ScenarioCreatePage({ onSaveScenario }) {
           )}
         </div>
       </aside>
+
+      <div
+        className="column-resizer column-resizer-create"
+        role="separator"
+        aria-label="시나리오 생성 패널 너비 조절"
+        aria-orientation="vertical"
+        onPointerDown={startCreatePanelResize}
+      />
+
+      <section className="creator-map" aria-label="시나리오 생성 지도">
+        <RouteMap
+          routes={savedRoutes}
+          draftRoute={draftRoute}
+          onSelectPoint={handleSelectPoint}
+          helperText={{
+            title: draftPointStep === "start" ? "시작지점 선택" : "종료지점 선택",
+            body: "지도를 클릭해 OD의 시작과 종료 좌표를 지정합니다."
+          }}
+        />
+      </section>
     </section>
   );
 }
-
 function CommunityPage({ posts, onCreatePost, onLikePost }) {
   const [activeBoard, setActiveBoard] = useState("general");
   const [form, setForm] = useState({ title: "", body: "", author: "" });
@@ -1750,6 +1784,7 @@ function PostList({ posts, onLikePost }) {
 function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const [analysisStatus, setAnalysisStatus] = useState("idle");
   const [routeStatus, setRouteStatus] = useState("idle");
+  const [columnWidths, setColumnWidths] = useState({ left: 520, right: 380 });
   const [uploadedFile, setUploadedFile] = useState(null);
   const [includeBaseOd, setIncludeBaseOd] = useState(true);
   const [selectedScenarioIds, setSelectedScenarioIds] = useState(
@@ -1762,7 +1797,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const [lowImpactPrunePercent, setLowImpactPrunePercent] = useState("20");
   const [edgeLimit, setEdgeLimit] = useState(50);
   const [sampleSize, setSampleSize] = useState("");
-  const [useAllRegions, setUseAllRegions] = useState(true);
+  const [useAllRegions, setUseAllRegions] = useState(false);
   const [selectedRegions, setSelectedRegions] = useState([]);
   const [regionBufferKm, setRegionBufferKm] = useState(10);
   const [errorMessage, setErrorMessage] = useState("");
@@ -1779,6 +1814,40 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   );
   const hasSelectedOdSource = includeBaseOd || supplementalOdCount > 0;
   const useRegionFilter = !useAllRegions && selectedRegions.length > 0;
+  const clampColumnWidth = (value, min, max) => Math.min(max, Math.max(min, value));
+
+  const startColumnResize = useCallback(
+    (side) => (event) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidths = columnWidths;
+
+      const handlePointerMove = (moveEvent) => {
+        const deltaX = moveEvent.clientX - startX;
+        setColumnWidths({
+          left:
+            side === "left"
+              ? clampColumnWidth(startWidths.left + deltaX, 280, 520)
+              : startWidths.left,
+          right:
+            side === "right"
+              ? clampColumnWidth(startWidths.right - deltaX, 300, 560)
+              : startWidths.right,
+        });
+      };
+
+      const handlePointerUp = () => {
+        window.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerup", handlePointerUp);
+        document.body.classList.remove("column-resizing");
+      };
+
+      document.body.classList.add("column-resizing");
+      window.addEventListener("pointermove", handlePointerMove);
+      window.addEventListener("pointerup", handlePointerUp);
+    },
+    [columnWidths]
+  );
 
   useEffect(() => {
     if (selectedScenarioId) {
@@ -1968,7 +2037,13 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
     {reportDialog && (
       <RouteReportDialog state={reportDialog} onClose={() => setReportDialog(null)} />
     )}
-    <section className={`dashboard od-mvp-dashboard ${analysisStatus === "success" ? "dashboard-analyzed" : "dashboard-idle"}`}>
+    <section
+      className={`dashboard od-mvp-dashboard ${analysisStatus === "idle" ? "dashboard-idle" : "dashboard-analyzed"}`}
+      style={{
+        "--left-panel-width": `${columnWidths.left}px`,
+        "--right-panel-width": `${columnWidths.right}px`,
+      }}
+    >
       <aside className="input-panel scenario-panel">
         <h2>
           <Network size={18} />
@@ -1977,8 +2052,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
 
         <label className="file-drop">
           <FileUp size={19} />
-          <span>CSV 파일 선택</span>
-          <small>{uploadedFile ? uploadedFile.name : "미선택 시 프로젝트 기본 CSV를 사용합니다."}</small>
+          <span>{uploadedFile ? uploadedFile.name : "CSV 미업로드 시 기본 OD 데이터 사용"}</span>
           <input
             type="file"
             accept=".csv,text/csv"
@@ -2167,6 +2241,14 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
         </div>
       </aside>
 
+      <div
+        className="column-resizer column-resizer-left"
+        role="separator"
+        aria-label="왼쪽 패널 너비 조절"
+        aria-orientation="vertical"
+        onPointerDown={startColumnResize("left")}
+      />
+
       <section className="main-panel">
         <section className="map-card" aria-label="OD 기반 후보 정점과 후보 연결쌍 지도">
           <div className="map-toolbar">
@@ -2193,51 +2275,6 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
                 : "기본 CSV 또는 업로드 CSV로 후보 생성을 실행하세요."
             }}
           />
-        </section>
-
-        <section className="scenario-detail-band">
-          <div>
-            <h2>OD 기반 신규 도로·터널 후보 생성</h2>
-            <p>
-              {stats
-                ? `${formatNumber(stats.total_od_rows)}개 OD 중 ${
-                    stats.selected_top_percent ? `상위 ${stats.selected_top_percent}% ` : "전체 "
-                  }${formatNumber(stats.selected_top_rows)}개 흐름 분석`
-                : "수단별 통행량을 가중 합산한 total_flow로 전체 OD 기반 후보를 생성합니다."}
-            </p>
-          </div>
-          {candidateResult && (
-            <div className="download-actions">
-              <button type="button" onClick={() => downloadJson("candidate_nodes.json", nodes)}>
-                <Download size={17} />
-                nodes JSON
-              </button>
-              <button type="button" onClick={() => downloadJson("candidate_edges.json", edges)}>
-                <Download size={17} />
-                edges JSON
-              </button>
-              {candidateRouteResult && (
-                <>
-                  <button type="button" onClick={() => downloadJson("candidate_routes.json", candidateRouteResult.routes)}>
-                    <Download size={17} />
-                    routes JSON
-                  </button>
-                  <button type="button" onClick={() => downloadJson("candidate_route_segments.json", candidateRouteResult.segments)}>
-                    <Download size={17} />
-                    segments JSON
-                  </button>
-                  <button type="button" onClick={() => downloadJson("candidate_route_costs.json", candidateRouteResult.costs)}>
-                    <Download size={17} />
-                    costs JSON
-                  </button>
-                  <button type="button" onClick={() => downloadJson("ranked_candidate_routes.json", candidateRouteResult.ranked_routes)}>
-                    <Download size={17} />
-                    ranked JSON
-                  </button>
-                </>
-              )}
-            </div>
-          )}
         </section>
 
         {candidateRouteResult && (
@@ -2359,6 +2396,15 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
         )}
       </section>
 
+      {analysisStatus !== "idle" && (
+      <>
+      <div
+        className="column-resizer column-resizer-right"
+        role="separator"
+        aria-label="오른쪽 패널 너비 조절"
+        aria-orientation="vertical"
+        onPointerDown={startColumnResize("right")}
+      />
       <aside className="result-panel">
         {analysisStatus === "idle" && (
           <div className="result-empty">
@@ -2501,6 +2547,8 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
           </>
         )}
       </aside>
+      </>
+      )}
     </section>
     </>
   );
@@ -2604,3 +2652,4 @@ function App() {
 }
 
 export default App;
+
