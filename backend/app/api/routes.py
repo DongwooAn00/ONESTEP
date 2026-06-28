@@ -7,13 +7,35 @@ from app.schemas.economic import AnalysisRequest, AnalysisResult
 from app.schemas.od_candidates import ODCandidateResult
 from app.schemas.route_cost import EvaluateRouteRequest, EvaluateRouteResult, RouteCostRequest, RouteCostResult
 from app.schemas.route_generation import RouteGenerationRequest, RouteGenerationResult
+<<<<<<< HEAD
 from app.schemas.route_reports import CandidateRouteReportsRequest, CandidateRouteReportsResult
+=======
+from app.schemas.vworld_land_price import (
+    LandPriceRequest,
+    LandPriceResult,
+    LandPriceSummaryResult,
+    LegalDongCodeResult,
+    LegalDongLandPriceRequest,
+)
+>>>>>>> 2759c0f66d0ef022f7d0f892afee68f370dee2cd
 from app.services.candidate_route_pipeline import build_candidate_routes
 from app.services.economic_analysis import analyze_project
+from app.services.legal_dong_code import list_legal_dong_codes
 from app.services.od_candidate_generation import build_od_candidates, build_od_candidates_with_supplemental
 from app.services.route_cost import analyze_route_cost, evaluate_route
 from app.services.route_generation import generate_route_candidates
+<<<<<<< HEAD
 from app.services.route_report_service import generate_candidate_route_reports
+=======
+from app.services.vworld_land_price import (
+    VWorldConfigError,
+    VWorldRequestError,
+    fetch_individual_land_prices,
+    fetch_individual_land_prices_by_legal_dong,
+    fetch_land_price_summary,
+    fetch_land_price_summary_by_legal_dong,
+)
+>>>>>>> 2759c0f66d0ef022f7d0f892afee68f370dee2cd
 
 router = APIRouter()
 
@@ -61,6 +83,102 @@ def create_candidate_route_reports(
         return generate_candidate_route_reports(payload)
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.get("/legal-dong-codes", response_model=LegalDongCodeResult)
+def get_legal_dong_codes(req_lvl: int, ld_code: str = "") -> LegalDongCodeResult:
+    try:
+        return LegalDongCodeResult(items=list_legal_dong_codes(req_lvl, ld_code))
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+
+
+@router.post("/land-prices", response_model=LandPriceResult)
+def create_land_price_lookup(payload: LandPriceRequest) -> LandPriceResult:
+    try:
+        data = fetch_individual_land_prices(
+            stdr_year=payload.stdr_year,
+            req_lvl=payload.req_lvl,
+            ld_code=payload.ld_code,
+            page_no=payload.page_no,
+            num_of_rows=payload.num_of_rows,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except VWorldConfigError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldRequestError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="VWorld API JSON 응답을 파싱하지 못했습니다.")
+    return LandPriceResult(data=data)
+
+
+@router.post("/land-prices/by-legal-dong", response_model=LandPriceResult)
+def create_land_price_lookup_by_legal_dong(payload: LegalDongLandPriceRequest) -> LandPriceResult:
+    try:
+        data = fetch_individual_land_prices_by_legal_dong(
+            stdr_year=payload.stdr_year,
+            req_lvl=payload.req_lvl,
+            legal_dong_code=payload.legal_dong_code,
+            legal_dong_name=payload.legal_dong_name,
+            page_no=payload.page_no,
+            num_of_rows=payload.num_of_rows,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldConfigError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldRequestError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    if not isinstance(data, dict):
+        raise HTTPException(status_code=502, detail="VWorld API JSON 응답을 파싱하지 못했습니다.")
+    return LandPriceResult(data=data)
+
+
+@router.post("/land-prices/summary", response_model=LandPriceSummaryResult)
+def create_land_price_summary(payload: LandPriceRequest) -> LandPriceSummaryResult:
+    try:
+        summary = fetch_land_price_summary(
+            stdr_year=payload.stdr_year,
+            req_lvl=payload.req_lvl,
+            ld_code=payload.ld_code,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except VWorldConfigError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldRequestError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    return LandPriceSummaryResult(summary=summary)
+
+
+@router.post("/land-prices/summary/by-legal-dong", response_model=LandPriceSummaryResult)
+def create_land_price_summary_by_legal_dong(payload: LegalDongLandPriceRequest) -> LandPriceSummaryResult:
+    try:
+        summary = fetch_land_price_summary_by_legal_dong(
+            stdr_year=payload.stdr_year,
+            req_lvl=payload.req_lvl,
+            legal_dong_code=payload.legal_dong_code,
+            legal_dong_name=payload.legal_dong_name,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    except FileNotFoundError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldConfigError as error:
+        raise HTTPException(status_code=500, detail=str(error)) from error
+    except VWorldRequestError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    return LandPriceSummaryResult(summary=summary)
 
 
 @router.post("/od-candidates", response_model=ODCandidateResult)
