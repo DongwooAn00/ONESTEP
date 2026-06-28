@@ -859,9 +859,10 @@ function Header({ activePage, onPageChange, onShowGuide }) {
   return (
     <header className="topbar">
       <div className="brand">
-        <span className="brand-mark">A</span>
+        <span className="brand-mark">1</span>
         <div>
           <strong>ONESTEP</strong>
+          <p className="brand-subtitle">교통 수요 기반 도로·터널 후보 노선 분석</p>
           <p>OD 시나리오 기반 도로·터널 후보지 경제성 분석</p>
         </div>
       </div>
@@ -2506,6 +2507,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
 }
 
 function App() {
+  const [hasStarted, setHasStarted] = useState(false);
   const [activePage, setActivePage] = useState("analysis");
   const [showGuide, setShowGuide] = useState(false);
   const [scenarios, setScenarios] = useState(sampleScenarios);
@@ -2525,6 +2527,67 @@ function App() {
     },
     [addScenario]
   );
+
+  if (!hasStarted) {
+    return (
+      <main className="service-intro">
+        <div className="service-intro-visual" aria-hidden="true">
+          <svg className="route-build-map" viewBox="0 0 620 420" role="img" aria-label="도로 후보 노선 연결 애니메이션">
+            <path className="route-grid-line" d="M70 80H540" />
+            <path className="route-grid-line" d="M90 190H560" />
+            <path className="route-grid-line" d="M70 310H520" />
+            <path className="route-grid-line" d="M150 42V360" />
+            <path className="route-grid-line" d="M320 58V380" />
+            <path className="route-grid-line" d="M485 42V350" />
+            <path className="route-shadow-path" d="M92 282 C160 224 206 216 260 232 S352 268 410 206 S496 104 548 122" />
+            <path className="route-build-path" d="M92 282 C160 224 206 216 260 232 S352 268 410 206 S496 104 548 122" />
+            <path className="route-build-path route-build-path-alt" d="M122 318 C214 314 266 294 318 250 S405 198 506 226" />
+            <g className="route-build-node node-one">
+              <circle cx="92" cy="282" r="17" />
+              <circle cx="92" cy="282" r="6" />
+            </g>
+            <g className="route-build-node node-two">
+              <circle cx="260" cy="232" r="17" />
+              <circle cx="260" cy="232" r="6" />
+            </g>
+            <g className="route-build-node node-three">
+              <circle cx="410" cy="206" r="17" />
+              <circle cx="410" cy="206" r="6" />
+            </g>
+            <g className="route-build-node node-four">
+              <circle cx="548" cy="122" r="17" />
+              <circle cx="548" cy="122" r="6" />
+            </g>
+            <circle className="route-progress-marker" cx="0" cy="0" r="11" />
+          </svg>
+        </div>
+        <section className="service-intro-content">
+          <div className="service-brand">
+            <span>1</span>
+            <strong>ONESTEP</strong>
+          </div>
+          <h1>
+            교통 수요 기반
+            <span>도로·터널 후보 노선</span>
+            <span>분석 서비스</span>
+          </h1>
+          <p>
+            교통 수요 데이터를 기반으로 도로·터널 후보지를 자동 산정하고,
+            <span>사업 초기 검토에 필요한 비용과 효과를 한 화면에서 확인합니다.</span>
+          </p>
+          <div className="service-intro-metrics" aria-label="서비스 핵심 기능">
+            <span>OD 수요 분석</span>
+            <span>후보 노선 산정</span>
+            <span>공사비 검토</span>
+          </div>
+          <button className="service-start-button" type="button" onClick={() => setHasStarted(true)}>
+            <Play size={19} fill="currentColor" />
+            서비스 시작하기
+          </button>
+        </section>
+      </main>
+    );
+  }
 
   return (
     <main className="prototype-shell">
