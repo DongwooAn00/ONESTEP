@@ -49,6 +49,9 @@ class ODCandidateStats(BaseModel):
     flow_weights: dict[str, float] = Field(default_factory=dict)
     coordinate_columns: dict[str, str]
     coordinate_lookup_used: bool = False
+    region_excluded_rows: int = 0
+    region_filter_summary: dict = Field(default_factory=dict)
+    elapsed_seconds: float = 0.0
     result_files: dict[str, str] = Field(default_factory=dict)
     warnings: list[str] = Field(default_factory=list)
 

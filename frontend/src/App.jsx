@@ -6,6 +6,7 @@ import {
   BookOpen,
   Building2,
   Download,
+  FileText,
   FileUp,
   Heart,
   ListPlus,
@@ -27,6 +28,25 @@ const KAKAO_MAP_JS_KEY = import.meta.env.VITE_KAKAO_MAP_JS_KEY;
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 const DEFAULT_CENTER = { lat: 36.35, lng: 127.85 };
 const DEFAULT_MAP_LEVEL = 11;
+const REGION_OPTIONS = [
+  "서울특별시",
+  "부산광역시",
+  "대구광역시",
+  "인천광역시",
+  "광주광역시",
+  "대전광역시",
+  "울산광역시",
+  "세종특별자치시",
+  "경기도",
+  "강원특별자치도",
+  "충청북도",
+  "충청남도",
+  "전북특별자치도",
+  "전라남도",
+  "경상북도",
+  "경상남도",
+  "제주특별자치도"
+];
 
 let kakaoMapSdkPromise;
 
@@ -166,6 +186,16 @@ function formatMoneyEok(value) {
 
 function downloadJson(filename, payload) {
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadText(filename, content, type = "text/markdown;charset=utf-8") {
+  const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -334,6 +364,7 @@ function RouteMap({
   const markersRef = useRef([]);
   const linesRef = useRef([]);
   const overlaysRef = useRef([]);
+  const focusRequestRef = useRef(0);
   const [loadError, setLoadError] = useState("");
   const [renderError, setRenderError] = useState("");
   const [mapReady, setMapReady] = useState(false);
@@ -461,8 +492,10 @@ function RouteMap({
       const maxSpan = Math.max(maxLat - minLat, maxLon - minLon);
       const level = Math.min(10, Math.max(5, maxSpan > 0.8 ? 9 : maxSpan > 0.35 ? 8 : preferredLevel));
 
-      map.setCenter(new kakao.maps.LatLng(centerLat, centerLon));
       map.setLevel(level);
+      // Zooming can adjust the Kakao Maps viewport, so apply the exact
+      // connection-pair midpoint after the level change.
+      map.setCenter(new kakao.maps.LatLng(centerLat, centerLon));
       return true;
     };
 
@@ -477,6 +510,7 @@ function RouteMap({
 
     clearMapItems();
     setRenderError("");
+    let focusTimer = null;
 
     try {
     allRoutes.forEach((route, index) => {
@@ -552,10 +586,9 @@ function RouteMap({
       const segmentStyle = {
         surface_road: { color: "#f59e0b", weight: 6, opacity: 0.9, style: "solid" },
         new_surface_road: { color: "#f59e0b", weight: 6, opacity: 0.9, style: "solid" },
+        connector: { color: "#eab308", weight: 5, opacity: 0.88, style: "shortdash" },
         existing_road: { color: "#1f9d55", weight: 4, opacity: 0.78, style: "solid" },
-        existing_tunnel: { color: "#5b4bb7", weight: 5, opacity: 0.86, style: "shortdash" },
-        tunnel: { color: "#7f57d9", weight: 6, opacity: 0.9, style: "shortdash" },
-        bridge: { color: "#14a8b5", weight: 6, opacity: 0.9, style: "dash" }
+        tunnel: { color: "#7f57d9", weight: 6, opacity: 0.9, style: "shortdash" }
       }[segment.segment_type] || { color: "#0b7ff3", weight: 5, opacity: 0.82, style: "solid" };
 
       const path = coordinates
@@ -647,30 +680,55 @@ function RouteMap({
       overlaysRef.current.push(overlay);
     });
 
-    window.setTimeout(() => {
+    focusTimer = window.setTimeout(() => {
       try {
         map.relayout();
         let focused = false;
+        const selectedEndpointPositions = (focusedCandidate?.endpoints || [])
+          .map((point) => toLatLng(point.lat, point.lng))
+          .filter(Boolean);
+        if (selectedEndpointPositions.length === 2) {
+          focused = fitPositions(selectedEndpointPositions, 7);
+        }
         if (focusedCandidate?.type === "edge") {
-          const edge = candidateEdges.find((item) => item.edge_id === focusedCandidate.id);
-          const fromNode = edge ? nodeById.get(edge.from_node_id) : null;
-          const toNode = edge ? nodeById.get(edge.to_node_id) : null;
-          focused = fitPositions([
-            fromNode ? toLatLng(fromNode.latitude, fromNode.longitude) : null,
-            toNode ? toLatLng(toNode.latitude, toNode.longitude) : null
-          ], 7);
+          if (!focused) {
+            const edge = candidateEdges.find((item) => item.edge_id === focusedCandidate.id);
+            const fromNode = edge ? nodeById.get(edge.from_node_id) : null;
+            const toNode = edge ? nodeById.get(edge.to_node_id) : null;
+            const endpointPositions = [
+              fromNode ? toLatLng(fromNode.latitude, fromNode.longitude) : null,
+              toNode ? toLatLng(toNode.latitude, toNode.longitude) : null
+            ].filter(Boolean);
+            focused = endpointPositions.length === 2 && fitPositions(endpointPositions, 7);
+          }
         }
         if (focusedCandidate?.type === "route") {
-          let positions = candidateRouteSegments
-            .filter((segment) => segment.route_id === focusedCandidate.id)
-            .flatMap((segment) => segment.segment_geometry || [])
-            .map((point) => toLatLng(point.lat, point.lon ?? point.lng ?? point.longitude));
-          if (!positions.length) {
-            const route = candidateRoutes.find((item) => item.route_id === focusedCandidate.id);
+          const route = candidateRoutes.find((item) => item.route_id === focusedCandidate.id);
+          let positions = selectedEndpointPositions;
+          if (!focused) {
+            const fromNode = route ? nodeById.get(route.from_node_id) : null;
+            const toNode = route ? nodeById.get(route.to_node_id) : null;
+            positions = [
+              fromNode ? toLatLng(fromNode.latitude, fromNode.longitude) : null,
+              toNode ? toLatLng(toNode.latitude, toNode.longitude) : null
+            ].filter(Boolean);
+          }
+
+          // A ranking row is still a connection pair. Its endpoints determine
+          // the viewport; route geometry is only a fallback for incomplete data.
+          if (!focused && positions.length < 2) {
+            positions = candidateRouteSegments
+              .filter((segment) => segment.route_id === focusedCandidate.id)
+              .flatMap((segment) => segment.segment_geometry || [])
+              .map((point) => toLatLng(point.lat, point.lon ?? point.lng ?? point.longitude));
+          }
+          if (!focused && !positions.length) {
             positions = (route?.route_geometry || [])
               .map((point) => toLatLng(point.lat, point.lon ?? point.lng ?? point.longitude));
           }
-          focused = fitPositions(positions, 7);
+          if (!focused) {
+            focused = fitPositions(positions, 7);
+          }
         }
         if (!focused && hasBounds) {
           fitMapToView();
@@ -685,6 +743,11 @@ function RouteMap({
       setRenderError(error.message || "지도 결과를 그리는 중 오류가 발생했습니다.");
       window.setTimeout(() => map.relayout(), 80);
     }
+    return () => {
+      if (focusTimer !== null) {
+        window.clearTimeout(focusTimer);
+      }
+    };
   }, [mapReady, routes, draftRoute, candidateNodes, candidateEdges, candidateRoutes, candidateRouteSegments, focusedCandidate]);
 
   useEffect(() => {
@@ -710,6 +773,56 @@ function RouteMap({
     observer.observe(containerRef.current);
     return () => observer.disconnect();
   }, [mapReady]);
+
+  useEffect(() => {
+    if (!mapReady || !window.kakao?.maps || !mapRef.current) {
+      return;
+    }
+    const endpoints = (focusedCandidate?.endpoints || [])
+      .map((point) => ({ lat: Number(point.lat), lng: Number(point.lng) }))
+      .filter((point) =>
+        Number.isFinite(point.lat)
+        && Number.isFinite(point.lng)
+        && point.lat >= -90
+        && point.lat <= 90
+        && point.lng >= -180
+        && point.lng <= 180
+      );
+    if (endpoints.length !== 2) {
+      return;
+    }
+
+    const requestId = focusRequestRef.current + 1;
+    focusRequestRef.current = requestId;
+    const map = mapRef.current;
+    const kakao = window.kakao;
+    const centerLat = (endpoints[0].lat + endpoints[1].lat) / 2;
+    const centerLng = (endpoints[0].lng + endpoints[1].lng) / 2;
+    const maxSpan = Math.max(
+      Math.abs(endpoints[0].lat - endpoints[1].lat),
+      Math.abs(endpoints[0].lng - endpoints[1].lng)
+    );
+    const level = maxSpan > 0.8 ? 9 : maxSpan > 0.35 ? 8 : 7;
+    const center = new kakao.maps.LatLng(centerLat, centerLng);
+
+    const applySelectedCenter = () => {
+      if (focusRequestRef.current !== requestId || mapRef.current !== map) {
+        return;
+      }
+      map.relayout();
+      map.setLevel(level);
+      map.setCenter(center);
+    };
+
+    applySelectedCenter();
+    const timers = [
+      window.setTimeout(applySelectedCenter, 120),
+      window.setTimeout(applySelectedCenter, 360)
+    ];
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [mapReady, focusedCandidate]);
 
   return (
     <div className={`live-map-wrap ${compact ? "compact-map" : ""}`}>
@@ -809,6 +922,93 @@ function GuideDialog({ onClose }) {
             <span>일반 게시판의 글이 좋아요 20개 이상이면 인기 게시판에 자동으로 표시됩니다.</span>
           </li>
         </ol>
+      </section>
+    </div>
+  );
+}
+
+function RouteReportDialog({ state, onClose }) {
+  const report = state?.report;
+  return (
+    <div className="guide-overlay report-overlay" role="dialog" aria-modal="true" aria-labelledby="report-title">
+      <section className="report-panel">
+        <div className="guide-head report-head">
+          <div>
+            <FileText size={20} />
+            <h2 id="report-title">{report?.title || "예비 후보 노선 검토 보고서"}</h2>
+          </div>
+          <button className="guide-close" type="button" aria-label="보고서 닫기" onClick={onClose}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {state.status === "loading" && (
+          <div className="report-message">
+            <FileText size={22} />
+            <strong>보고서 생성 중</strong>
+            <span>계산된 후보 노선 데이터를 보고서 형식으로 정리하고 있습니다.</span>
+          </div>
+        )}
+        {state.status === "error" && (
+          <div className="report-message error-state">
+            <AlertCircle size={22} />
+            <strong>보고서를 생성하지 못했습니다.</strong>
+            <span>{state.error}</span>
+          </div>
+        )}
+        {state.status === "success" && report && (
+          <>
+            <div className="report-content">
+              <p className="report-summary">{report.summary}</p>
+              <div className="report-metrics">
+                <span>총 연장<strong>{report.metrics.total_length_km == null ? "현재 산정 불가" : `${report.metrics.total_length_km.toFixed(2)} km`}</strong></span>
+                <span>총사업비<strong>{report.metrics.total_project_cost == null ? "현재 산정 불가" : formatMoneyEok(report.metrics.total_project_cost)}</strong></span>
+                <span>총편익<strong>{report.metrics.benefit == null ? "현재 산정 불가" : formatMoneyEok(report.metrics.benefit)}</strong></span>
+                <span>B/C<strong>{report.metrics.benefit_cost_ratio == null ? "현재 산정 불가" : report.metrics.benefit_cost_ratio.toFixed(2)}</strong></span>
+              </div>
+
+              {[
+                ["1. 노선 개요", report.route_overview],
+                ["2. 비용 분석", report.cost_analysis],
+                ["3. 편익 분석", report.benefit_analysis],
+                ["4. 기술적 검토", report.technical_review]
+              ].map(([title, body]) => (
+                <section className="report-section" key={title}>
+                  <h3>{title}</h3>
+                  <p>{body}</p>
+                  {title.startsWith("4.") && report.advantages?.length > 0 && (
+                    <>
+                      <h4>주요 장점</h4>
+                      <ul>{report.advantages.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </>
+                  )}
+                </section>
+              ))}
+
+              <section className="report-section">
+                <h3>5. 위험요소 및 한계</h3>
+                <p>{report.risk_review}</p>
+                {report.limitations?.length > 0 && (
+                  <ul>{report.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
+                )}
+                <p className="report-scope-note">교량 분석은 이번 MVP 범위에서 제외됩니다.</p>
+              </section>
+              <section className="report-section">
+                <h3>6. 종합 검토 의견</h3>
+                <p>{report.final_opinion}</p>
+              </section>
+            </div>
+            <div className="report-actions">
+              <button
+                type="button"
+                onClick={() => downloadText(`${report.route_id}_preliminary_report.md`, report.markdown)}
+              >
+                <Download size={17} />
+                Markdown 저장
+              </button>
+            </div>
+          </>
+        )}
       </section>
     </div>
   );
@@ -1561,9 +1761,13 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const [lowImpactPrunePercent, setLowImpactPrunePercent] = useState("20");
   const [edgeLimit, setEdgeLimit] = useState(50);
   const [sampleSize, setSampleSize] = useState("");
+  const [useAllRegions, setUseAllRegions] = useState(true);
+  const [selectedRegions, setSelectedRegions] = useState([]);
+  const [regionBufferKm, setRegionBufferKm] = useState(10);
   const [errorMessage, setErrorMessage] = useState("");
   const [routeErrorMessage, setRouteErrorMessage] = useState("");
   const [focusedCandidate, setFocusedCandidate] = useState(null);
+  const [reportDialog, setReportDialog] = useState(null);
   const selectedSupplementalScenarios = useMemo(
     () => scenarios.filter((scenario) => selectedScenarioIds.includes(scenario.id)),
     [scenarios, selectedScenarioIds]
@@ -1573,6 +1777,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
     0
   );
   const hasSelectedOdSource = includeBaseOd || supplementalOdCount > 0;
+  const useRegionFilter = !useAllRegions && selectedRegions.length > 0;
 
   useEffect(() => {
     if (selectedScenarioId) {
@@ -1588,6 +1793,14 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
     );
   }, []);
 
+  const toggleRegionSelection = useCallback((regionName) => {
+    setSelectedRegions((current) =>
+      current.includes(regionName)
+        ? current.filter((name) => name !== regionName)
+        : [...current, regionName]
+    );
+  }, []);
+
   const runCandidateGeneration = async () => {
     setAnalysisStatus("loading");
     setRouteStatus("idle");
@@ -1596,11 +1809,19 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
     setCandidateResult(null);
     setCandidateRouteResult(null);
     setFocusedCandidate(null);
+    setReportDialog(null);
 
     const formData = new FormData();
     formData.append("top_node_limit", "100");
     formData.append("edge_limit", String(edgeLimit));
     formData.append("include_base_od", includeBaseOd ? "true" : "false");
+    formData.append("use_region_filter", useRegionFilter ? "true" : "false");
+    formData.append("region_buffer_km", String(regionBufferKm));
+    if (useRegionFilter) {
+      selectedRegions.forEach((regionName) => {
+        formData.append("selected_regions", regionName);
+      });
+    }
     if (flowFilterPercent) {
       formData.append("flow_filter_percent", flowFilterPercent);
     }
@@ -1647,15 +1868,20 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
     setRouteErrorMessage("");
     setCandidateRouteResult(null);
     setFocusedCandidate(null);
+    setReportDialog(null);
 
     try {
+      const appliedRegion = candidateResult?.stats?.region_filter_summary;
       const response = await fetch(`${API_BASE_URL}/api/candidate-routes`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nodes: candidateResult.nodes,
           edges: candidateResult.edges,
-          route_limit: routeLimit
+          route_limit: routeLimit,
+          selected_regions: appliedRegion?.selected_regions || [],
+          use_region_filter: Boolean(appliedRegion?.enabled),
+          region_buffer_km: appliedRegion?.buffer_km ?? regionBufferKm
         })
       });
       const payload = await response.json();
@@ -1678,8 +1904,69 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const rankedRoutes = candidateRouteResult?.ranked_routes || [];
   const routeCosts = candidateRouteResult?.costs || [];
   const costByRouteId = new Map(routeCosts.map((cost) => [cost.route_id, cost]));
+  const nodeById = new Map(nodes.map((node) => [node.node_id, node]));
+
+  const focusConnectionPair = useCallback((type, id, fromNodeId, toNodeId) => {
+    const fromNode = nodeById.get(fromNodeId);
+    const toNode = nodeById.get(toNodeId);
+    const endpoints = fromNode && toNode
+      ? [
+          { lat: Number(fromNode.latitude), lng: Number(fromNode.longitude) },
+          { lat: Number(toNode.latitude), lng: Number(toNode.longitude) }
+        ]
+      : [];
+    setFocusedCandidate({
+      type,
+      id,
+      fromNodeId,
+      toNodeId,
+      endpoints
+    });
+  }, [nodes]);
+
+  const openRouteReport = useCallback(async (event, routeId) => {
+    event.stopPropagation();
+    setReportDialog({ status: "loading", routeId, report: null, error: "" });
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/candidate-routes/reports`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          routes: candidateRoutes,
+          segments: routeSegments,
+          costs: routeCosts,
+          ranked_routes: rankedRoutes,
+          route_ids: [routeId]
+        })
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.detail || "예비 후보 노선 보고서 생성에 실패했습니다.");
+      }
+      if (!payload.reports?.[0]) {
+        throw new Error("선택한 후보 노선의 보고서 데이터가 없습니다.");
+      }
+      setReportDialog({
+        status: "success",
+        routeId,
+        report: payload.reports[0],
+        error: ""
+      });
+    } catch (error) {
+      setReportDialog({
+        status: "error",
+        routeId,
+        report: null,
+        error: error.message
+      });
+    }
+  }, [candidateRoutes, routeSegments, routeCosts, rankedRoutes]);
 
   return (
+    <>
+    {reportDialog && (
+      <RouteReportDialog state={reportDialog} onClose={() => setReportDialog(null)} />
+    )}
     <section className={`dashboard od-mvp-dashboard ${analysisStatus === "success" ? "dashboard-analyzed" : "dashboard-idle"}`}>
       <aside className="input-panel scenario-panel">
         <h2>
@@ -1750,6 +2037,57 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
           </div>
         </div>
 
+        <div className="analysis-options region-filter-options">
+          <div className="region-filter-heading">
+            <div>
+              <strong>계산 구역 선택</strong>
+              <small>선택 구역과 경계 여유 범위의 데이터만 계산합니다.</small>
+            </div>
+            <label className="region-all-toggle">
+              <input
+                type="checkbox"
+                checked={useAllRegions}
+                onChange={(event) => setUseAllRegions(event.target.checked)}
+              />
+              전체 사용
+            </label>
+          </div>
+          <div className={`region-checkbox-grid ${useAllRegions ? "disabled" : ""}`}>
+            {REGION_OPTIONS.map((regionName) => (
+              <label
+                className={selectedRegions.includes(regionName) ? "selected" : ""}
+                key={regionName}
+              >
+                <input
+                  type="checkbox"
+                  checked={selectedRegions.includes(regionName)}
+                  disabled={useAllRegions}
+                  onChange={() => toggleRegionSelection(regionName)}
+                />
+                {regionName}
+              </label>
+            ))}
+          </div>
+          <label className="plain-field region-buffer-field">
+            <span>경계 여유 거리</span>
+            <div>
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="1"
+                value={regionBufferKm}
+                disabled={useAllRegions}
+                onChange={(event) => setRegionBufferKm(Number(event.target.value))}
+              />
+              <small>km</small>
+            </div>
+          </label>
+          {!useAllRegions && !selectedRegions.length && (
+            <p className="status-text">구역을 선택하지 않으면 기존처럼 전체 범위로 계산합니다.</p>
+          )}
+        </div>
+
         <div className="analysis-options candidate-options">
           <label className="plain-field">
             <span>OD 필터</span>
@@ -1798,7 +2136,9 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
         </button>
 
         <p className="status-text">
-          전체 OD의 total_flow를 sample_weight로 사용해 후보 정점을 만들고, 전체 OD 기반 estimated_flow로 초기 후보 연결쌍을 정렬합니다.
+          {useRegionFilter
+            ? `${selectedRegions.join(", ")} 및 경계 ${regionBufferKm}km 범위의 OD만 사용합니다.`
+            : "전체 OD의 total_flow를 sample_weight로 사용해 후보 정점을 만들고, 전체 OD 기반 estimated_flow로 초기 후보 연결쌍을 정렬합니다."}
         </p>
 
         <div className="analysis-options">
@@ -1830,15 +2170,13 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
         <section className="map-card" aria-label="OD 기반 후보 정점과 후보 연결쌍 지도">
           <div className="map-toolbar">
             <span className="legend candidate" />
-            전체 OD 가중치 기반 후보 정점
+            {stats?.region_filter_summary?.enabled ? "선택 구역 OD" : "전체 OD"} 가중치 기반 후보 정점
             <span className="legend existing-road" />
             기존도로
             <span className="legend new-road" />
             신설도로
             <span className="legend tunnel" />
             터널
-            <span className="legend bridge" />
-            교량
           </div>
           <RouteMap
             routes={[]}
@@ -1909,22 +2247,31 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
             </div>
             <div className="stats-grid">
               <span>
-                성공
-                <strong>{formatNumber(candidateRouteResult.routes.filter((route) => route.status === "success").length)}</strong>
+                신규 후보
+                <strong>{formatNumber(rankedRoutes.length)}</strong>
+              </span>
+              <span>
+                기준 경로
+                <strong>{formatNumber(candidateRouteResult.routes.filter((route) => route.route_type === "existing_baseline").length)}</strong>
+              </span>
+              <span>
+                터널 구간
+                <strong>{formatNumber(routeSegments.filter((segment) => segment.segment_type === "tunnel").length)}</strong>
               </span>
               <span>
                 실패
                 <strong>{formatNumber(candidateRouteResult.routes.filter((route) => route.status === "failed").length)}</strong>
               </span>
-              <span>
-                터널 구간
-                <strong>{formatNumber(routeSegments.filter((segment) => ["tunnel", "existing_tunnel"].includes(segment.segment_type)).length)}</strong>
-              </span>
-              <span>
-                교량 구간
-                <strong>{formatNumber(routeSegments.filter((segment) => segment.segment_type === "bridge").length)}</strong>
-              </span>
             </div>
+            {candidateRouteResult.region_filter_summary && (
+              <p className="status-text">
+                계산 범위: {candidateRouteResult.region_filter_summary.enabled
+                  ? candidateRouteResult.region_filter_summary.selected_regions.join(", ")
+                  : "전체"} · A* {formatNumber(candidateRouteResult.region_filter_summary.a_star_calls)}회 ·
+                격자 {formatNumber(candidateRouteResult.region_filter_summary.cost_grid_cells)}셀 ·
+                {Number(candidateRouteResult.region_filter_summary.elapsed_seconds || 0).toFixed(2)}초
+              </p>
+            )}
             {candidateRouteResult.warnings.map((warning) => (
               <p className="status-text" key={warning}>{warning}</p>
             ))}
@@ -1955,6 +2302,16 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
                 <strong>{stats.cluster_count_used}/{stats.cluster_count_requested}</strong>
               </span>
             </div>
+            {stats.region_filter_summary && (
+              <p className="status-text">
+                구역 필터: {stats.region_filter_summary.enabled
+                  ? stats.region_filter_summary.selected_regions.join(", ")
+                  : "전체"} · OD {formatNumber(stats.region_filter_summary.od_rows_before)} →{" "}
+                {formatNumber(stats.region_filter_summary.od_rows_after)} · 좌표{" "}
+                {formatNumber(stats.region_filter_summary.candidate_coordinates_before)} →{" "}
+                {formatNumber(stats.region_filter_summary.candidate_coordinates_after)}
+              </p>
+            )}
             <div className="stats-grid iterative-stats">
               <span>
                 원시 중심점
@@ -2052,11 +2409,21 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
                     key={route.route_id}
                     role="button"
                     tabIndex={0}
-                    onClick={() => setFocusedCandidate({ type: "route", id: route.route_id })}
+                    onClick={() => focusConnectionPair(
+                      "route",
+                      route.route_id,
+                      route.from_node_id,
+                      route.to_node_id
+                    )}
                     onKeyDown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
                         event.preventDefault();
-                        setFocusedCandidate({ type: "route", id: route.route_id });
+                        focusConnectionPair(
+                          "route",
+                          route.route_id,
+                          route.from_node_id,
+                          route.to_node_id
+                        );
                       }
                     }}
                   >
@@ -2070,16 +2437,25 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
                       <span>예상 수요 <strong>{formatNumber(route.estimated_flow)}</strong></span>
                       <span>거리 절감 <strong>{Number(route.summary.distance_saving_km || route.distance_saving_km || 0).toFixed(2)} km</strong></span>
                       <span>기존도로 <strong>{Number(route.summary.existing_road_length_km || 0).toFixed(2)} km</strong></span>
-                      <span>기존터널 <strong>{Number(route.summary.existing_tunnel_length_km || 0).toFixed(2)} km</strong></span>
                       <span>신설 지상도로 <strong>{Number(route.summary.new_surface_road_length_km ?? route.summary.surface_road_length_km).toFixed(2)} km</strong></span>
+                      <span>접속도로 <strong>{Number(route.summary.connector_length_km || 0).toFixed(2)} km</strong></span>
                       <span>신설터널 <strong>{route.summary.tunnel_length_km.toFixed(2)} km</strong></span>
-                      <span>교량 <strong>{route.summary.bridge_length_km.toFixed(2)} km</strong></span>
                       <span>수요x절감 <strong>{formatNumber(route.summary.benefit_proxy || 0)}</strong></span>
                       <span>직접공사비 <strong>{formatMoneyEok(cost?.total_direct_cost)}</strong></span>
                       <span>예비율 포함 공사비 <strong>{formatMoneyEok(route.total_screen_cost)}</strong></span>
                       <span>MVP 예비 경제성 점수 <strong>{route.economic_score.toFixed(1)}</strong></span>
                     </div>
                     {route.summary.failed_reason && <p className="status-text error-copy">{route.summary.failed_reason}</p>}
+                    <div className="route-report-actions">
+                      <button
+                        type="button"
+                        onClick={(event) => openRouteReport(event, route.route_id)}
+                        onKeyDown={(event) => event.stopPropagation()}
+                      >
+                        <FileText size={16} />
+                        보고서 보기
+                      </button>
+                    </div>
                   </article>
                 );
               }) : edges.map((edge) => (
@@ -2090,11 +2466,21 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
                   key={edge.edge_id}
                   role="button"
                   tabIndex={0}
-                  onClick={() => setFocusedCandidate({ type: "edge", id: edge.edge_id })}
+                  onClick={() => focusConnectionPair(
+                    "edge",
+                    edge.edge_id,
+                    edge.from_node_id,
+                    edge.to_node_id
+                  )}
                   onKeyDown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      setFocusedCandidate({ type: "edge", id: edge.edge_id });
+                      focusConnectionPair(
+                        "edge",
+                        edge.edge_id,
+                        edge.from_node_id,
+                        edge.to_node_id
+                      );
                     }
                   }}
                 >
@@ -2106,7 +2492,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
                     <span>거리 <strong>{edge.straight_distance_km.toFixed(2)} km</strong></span>
                     <span>추정 수요 <strong>{formatNumber(edge.estimated_flow)}</strong></span>
                     <span>집계 OD <strong>{formatNumber(edge.od_count)}</strong></span>
-                    <span>기준 <strong>전체 OD</strong></span>
+                    <span>기준 <strong>{stats?.region_filter_summary?.enabled ? "선택 구역 OD" : "전체 OD"}</strong></span>
                   </div>
                 </article>
               ))}
@@ -2115,6 +2501,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
         )}
       </aside>
     </section>
+    </>
   );
 }
 

@@ -69,8 +69,7 @@ def _tunnel_risk_summary(row: dict) -> dict:
     return {
         "total_tunnel_length_m": round(float(row.get("tunnel_length_km", 0.0)) * 1000.0, 1),
         "tunnel_count": int(row.get("tunnel_segment_count", len(tunnel_segments))),
-        "bridge_count": int(row.get("bridge_segment_count", 0)),
-        "surface_road_length_m": round(float(row.get("surface_road_length_km", 0.0)) * 1000.0, 1),
+        "surface_road_length_m": round(float(row.get("new_surface_road_length_km", 0.0)) * 1000.0, 1),
         "tunnel_length_by_rock_class": {
             key: round(value, 1) for key, value in tunnel_length_by_rock_class.items()
         },
@@ -83,9 +82,13 @@ def _tunnel_risk_summary(row: dict) -> dict:
 
 
 def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
-    successful = [row for row in route_rows if row["status"] == "success"]
+    successful = [
+        row
+        for row in route_rows
+        if row["status"] == "success" and row.get("route_type") != "existing_baseline"
+    ]
     benefit_values = [
-        row["estimated_flow"] * row["distance_saving_km"]
+        row.get("total_benefit", row["estimated_flow"] * row.get("distance_saving_km", 0.0))
         for row in successful
     ]
     cost_values = [row["total_screen_cost"] for row in successful]
@@ -95,11 +98,11 @@ def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
     normalized_scores = _min_max(raw_scores)
 
     by_route_id = {
-        row["route_id"]: round(score, 2)
+        row["route_id"]: round(row.get("candidate_score", score), 2)
         for row, score in zip(successful, normalized_scores)
     }
     ranked = []
-    for row in route_rows:
+    for row in successful:
         score = by_route_id.get(row["route_id"], 0.0)
         tunnel_summary = _tunnel_risk_summary(row)
         assumed_existing_length = _assumed_existing_route_length_km(
@@ -111,12 +114,21 @@ def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
             {
                 "rank": 0,
                 "route_id": row["route_id"],
+                "route_type": row.get("route_type", "new_direct"),
                 "from_node_id": row["from_node_id"],
                 "to_node_id": row["to_node_id"],
                 "estimated_flow": row["estimated_flow"],
                 "distance_saving_km": round(row["distance_saving_km"], 3),
                 "total_screen_cost": round(row["total_screen_cost"], 3),
                 "economic_score": score,
+                "candidate_score": score,
+                "construction_cost": row.get("construction_cost", row["total_screen_cost"]),
+                "annual_benefit": row.get("annual_benefit", 0.0),
+                "total_benefit": row.get("total_benefit", 0.0),
+                "benefit_cost_ratio": row.get("benefit_cost_ratio", 0.0),
+                "net_benefit": row.get("net_benefit", 0.0),
+                "time_saving_minutes": row.get("time_saving_minutes", 0.0),
+                "new_segment_ratio": row.get("new_segment_ratio", 0.0),
                 **tunnel_summary,
                 "summary": {
                     "label": "MVP 예비 경제성 점수",
@@ -127,17 +139,25 @@ def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
                     "distance_saving_km": round(row["distance_saving_km"], 3),
                     "benefit_proxy": round(benefit_proxy, 3),
                     "cost_per_flow_saving": round(cost_per_flow_saving, 6) if cost_per_flow_saving is not None else None,
-                    "surface_road_length_km": row["surface_road_length_km"],
+                    "route_type": row.get("route_type", "new_direct"),
+                    "surface_road_length_km": row.get("new_surface_road_length_km", row.get("surface_road_length_km", 0.0)),
                     "existing_road_length_km": row.get("existing_road_length_km", 0.0),
-                    "existing_tunnel_length_km": row.get("existing_tunnel_length_km", 0.0),
                     "new_surface_road_length_km": row.get("new_surface_road_length_km", row["surface_road_length_km"]),
+                    "connector_length_km": row.get("connector_length_km", 0.0),
                     "tunnel_length_km": row["tunnel_length_km"],
-                    "bridge_length_km": row["bridge_length_km"],
                     "existing_road_access_length_km": row.get("existing_road_access_length_km", 0.0),
                     "existing_road_access_percent": row.get("existing_road_access_percent", 0.0),
                     "route_generation_method": row.get("route_generation_method", "unknown"),
                     "river_crossing_count": row.get("river_crossing_count", 0),
                     "failed_reason": row.get("failed_reason"),
+                    "annual_benefit": row.get("annual_benefit", 0.0),
+                    "total_benefit": row.get("total_benefit", 0.0),
+                    "benefit_cost_ratio": row.get("benefit_cost_ratio", 0.0),
+                    "net_benefit": row.get("net_benefit", 0.0),
+                    "time_saving_minutes": row.get("time_saving_minutes", 0.0),
+                    "new_segment_ratio": row.get("new_segment_ratio", 0.0),
+                    "candidate_score": score,
+                    "explanation": row.get("explanation", []),
                     **tunnel_summary,
                 },
             }

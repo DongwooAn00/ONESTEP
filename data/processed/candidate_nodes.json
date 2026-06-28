@@ -1,25 +1,27 @@
 [
   {
     "node_id": "N001",
-    "latitude": 37.57104,
-    "longitude": 126.903748,
-    "x": 947347.009,
-    "y": 1952574.837,
-    "cluster_total_flow": 52895416.4,
-    "included_od_count": 2070523,
+    "latitude": 37.441652,
+    "longitude": 127.136245,
+    "x": 967822.616,
+    "y": 1938115.203,
+    "cluster_total_flow": 11374185.4,
+    "included_od_count": 178444,
     "source_k_values": [
-      10
+      10,
+      30,
+      50
     ],
-    "merged_count": 1
+    "merged_count": 3
   },
   {
     "node_id": "N002",
-    "latitude": 35.180635,
-    "longitude": 129.041546,
-    "x": 1140364.541,
-    "y": 1688348.164,
-    "cluster_total_flow": 48201847.8,
-    "included_od_count": 985212,
+    "latitude": 37.508709,
+    "longitude": 127.107681,
+    "x": 965326.892,
+    "y": 1945564.825,
+    "cluster_total_flow": 9579017.4,
+    "included_od_count": 178881,
     "source_k_values": [
       20,
       30,
@@ -29,12 +31,12 @@
   },
   {
     "node_id": "N003",
-    "latitude": 36.335426,
-    "longitude": 127.385,
-    "x": 989679.406,
-    "y": 1815344.281,
-    "cluster_total_flow": 37814408.8,
-    "included_od_count": 757983,
+    "latitude": 37.630403,
+    "longitude": 127.102817,
+    "x": 964954.009,
+    "y": 1959067.867,
+    "cluster_total_flow": 6787311.0,
+    "included_od_count": 151245,
     "source_k_values": [
       20,
       30,
@@ -44,26 +46,25 @@
   },
   {
     "node_id": "N004",
-    "latitude": 36.843967,
-    "longitude": 127.005491,
-    "x": 955910.631,
-    "y": 1871862.429,
-    "cluster_total_flow": 29338862.4,
-    "included_od_count": 721738,
+    "latitude": 37.231053,
+    "longitude": 127.105002,
+    "x": 964961.211,
+    "y": 1914762.367,
+    "cluster_total_flow": 5926357.8,
+    "included_od_count": 78677,
     "source_k_values": [
-      10,
-      20
+      10
     ],
-    "merged_count": 2
+    "merged_count": 1
   },
   {
     "node_id": "N005",
-    "latitude": 37.314181,
-    "longitude": 127.071605,
-    "x": 962040.413,
-    "y": 1923997.416,
-    "cluster_total_flow": 28455222.0,
-    "included_od_count": 981710,
+    "latitude": 37.625579,
+    "longitude": 127.151954,
+    "x": 969287.692,
+    "y": 1958515.459,
+    "cluster_total_flow": 5743021.2,
+    "included_od_count": 114359,
     "source_k_values": [
       10
     ],
@@ -71,65 +72,12 @@
   },
   {
     "node_id": "N006",
-    "latitude": 35.25429,
-    "longitude": 129.004005,
-    "x": 1136822.269,
-    "y": 1696465.13,
-    "cluster_total_flow": 28348542.4,
-    "included_od_count": 593043,
-    "source_k_values": [
-      10
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N007",
-    "latitude": 36.46602,
-    "longitude": 127.40074,
-    "x": 991106.888,
-    "y": 1829828.504,
-    "cluster_total_flow": 27870513.4,
-    "included_od_count": 521684,
-    "source_k_values": [
-      10
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N008",
-    "latitude": 35.90658,
-    "longitude": 128.539188,
-    "x": 1093771.487,
-    "y": 1768270.568,
-    "cluster_total_flow": 27852901.4,
-    "included_od_count": 832163,
-    "source_k_values": [
-      20,
-      30
-    ],
-    "merged_count": 2
-  },
-  {
-    "node_id": "N009",
-    "latitude": 37.585964,
-    "longitude": 127.066141,
-    "x": 961695.08,
-    "y": 1954151.879,
-    "cluster_total_flow": 27749783.8,
-    "included_od_count": 1105826,
-    "source_k_values": [
-      20
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N010",
-    "latitude": 37.680086,
-    "longitude": 126.745287,
-    "x": 933450.869,
-    "y": 1964773.796,
-    "cluster_total_flow": 25220287.2,
-    "included_od_count": 805920,
+    "latitude": 37.174357,
+    "longitude": 127.097531,
+    "x": 964271.735,
+    "y": 1908475.415,
+    "cluster_total_flow": 4828275.0,
+    "included_od_count": 63098,
     "source_k_values": [
       20,
       30,
@@ -138,13 +86,71 @@
     "merged_count": 3
   },
   {
+    "node_id": "N007",
+    "latitude": 37.29892,
+    "longitude": 127.504657,
+    "x": 1000412.737,
+    "y": 1922218.397,
+    "cluster_total_flow": 4808687.8,
+    "included_od_count": 95524,
+    "source_k_values": [
+      10,
+      20,
+      30
+    ],
+    "merged_count": 3
+  },
+  {
+    "node_id": "N008",
+    "latitude": 37.886834,
+    "longitude": 127.749815,
+    "x": 1021966.739,
+    "y": 1987473.538,
+    "cluster_total_flow": 4498427.0,
+    "included_od_count": 83127,
+    "source_k_values": [
+      10,
+      20,
+      50
+    ],
+    "merged_count": 3
+  },
+  {
+    "node_id": "N009",
+    "latitude": 37.343471,
+    "longitude": 127.950373,
+    "x": 1039891.575,
+    "y": 1927255.956,
+    "cluster_total_flow": 4375637.4,
+    "included_od_count": 68887,
+    "source_k_values": [
+      20,
+      30,
+      50
+    ],
+    "merged_count": 3
+  },
+  {
+    "node_id": "N010",
+    "latitude": 37.401869,
+    "longitude": 127.163214,
+    "x": 970192.537,
+    "y": 1933692.676,
+    "cluster_total_flow": 4212144.6,
+    "included_od_count": 58704,
+    "source_k_values": [
+      20
+    ],
+    "merged_count": 1
+  },
+  {
     "node_id": "N011",
-    "latitude": 37.445033,
-    "longitude": 126.789941,
-    "x": 937191.467,
-    "y": 1938664.823,
-    "cluster_total_flow": 24412096.0,
-    "included_od_count": 982745,
+    "latitude": 37.287603,
+    "longitude": 127.096703,
+    "x": 964251.73,
+    "y": 1921039.136,
+    "cluster_total_flow": 3741100.2,
+    "included_od_count": 42564,
     "source_k_values": [
       20
     ],
@@ -152,12 +158,40 @@
   },
   {
     "node_id": "N012",
-    "latitude": 35.179835,
-    "longitude": 126.859277,
-    "x": 941660.735,
-    "y": 1687359.28,
-    "cluster_total_flow": 23988576.2,
-    "included_od_count": 758151,
+    "latitude": 37.260318,
+    "longitude": 127.068117,
+    "x": 961704.086,
+    "y": 1918023.293,
+    "cluster_total_flow": 3422345.6,
+    "included_od_count": 41664,
+    "source_k_values": [
+      30,
+      50
+    ],
+    "merged_count": 2
+  },
+  {
+    "node_id": "N013",
+    "latitude": 37.567669,
+    "longitude": 127.188382,
+    "x": 972480.899,
+    "y": 1952079.404,
+    "cluster_total_flow": 3340676.0,
+    "included_od_count": 51378,
+    "source_k_values": [
+      30,
+      50
+    ],
+    "merged_count": 2
+  },
+  {
+    "node_id": "N014",
+    "latitude": 37.76121,
+    "longitude": 128.882996,
+    "x": 1121819.003,
+    "y": 1974406.7,
+    "cluster_total_flow": 2800437.2,
+    "included_od_count": 50865,
     "source_k_values": [
       20,
       30,
@@ -166,52 +200,27 @@
     "merged_count": 3
   },
   {
-    "node_id": "N013",
-    "latitude": 37.546096,
-    "longitude": 127.016354,
-    "x": 957276.689,
-    "y": 1949750.286,
-    "cluster_total_flow": 22659731.6,
-    "included_od_count": 953300,
-    "source_k_values": [
-      30
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N014",
-    "latitude": 37.273679,
-    "longitude": 127.098837,
-    "x": 964434.351,
-    "y": 1919493.531,
-    "cluster_total_flow": 19507251.0,
-    "included_od_count": 621290,
-    "source_k_values": [
-      20
-    ],
-    "merged_count": 1
-  },
-  {
     "node_id": "N015",
-    "latitude": 35.963967,
-    "longitude": 128.685676,
-    "x": 1106913.167,
-    "y": 1774786.543,
-    "cluster_total_flow": 18408823.2,
-    "included_od_count": 580901,
+    "latitude": 37.77166,
+    "longitude": 127.097555,
+    "x": 964557.091,
+    "y": 1974741.981,
+    "cluster_total_flow": 2629722.2,
+    "included_od_count": 32432,
     "source_k_values": [
-      10
+      30,
+      50
     ],
-    "merged_count": 1
+    "merged_count": 2
   },
   {
     "node_id": "N016",
-    "latitude": 37.447096,
-    "longitude": 126.748217,
-    "x": 933502.516,
-    "y": 1938922.269,
-    "cluster_total_flow": 18407295.0,
-    "included_od_count": 712289,
+    "latitude": 37.349643,
+    "longitude": 127.103919,
+    "x": 964920.207,
+    "y": 1927919.089,
+    "cluster_total_flow": 2561209.0,
+    "included_od_count": 29603,
     "source_k_values": [
       30
     ],
@@ -219,27 +228,25 @@
   },
   {
     "node_id": "N017",
-    "latitude": 35.544288,
-    "longitude": 129.304656,
-    "x": 1163588.764,
-    "y": 1729088.212,
-    "cluster_total_flow": 16189061.8,
-    "included_od_count": 297000,
+    "latitude": 37.315305,
+    "longitude": 128.016715,
+    "x": 1045784.925,
+    "y": 1924161.288,
+    "cluster_total_flow": 2320288.8,
+    "included_od_count": 47805,
     "source_k_values": [
-      20,
-      30,
-      50
+      10
     ],
-    "merged_count": 3
+    "merged_count": 1
   },
   {
     "node_id": "N018",
-    "latitude": 36.65488,
-    "longitude": 127.482469,
-    "x": 998433.14,
-    "y": 1850773.285,
-    "cluster_total_flow": 15661053.2,
-    "included_od_count": 294321,
+    "latitude": 37.26376,
+    "longitude": 127.164341,
+    "x": 970237.798,
+    "y": 1918370.492,
+    "cluster_total_flow": 2117226.2,
+    "included_od_count": 26953,
     "source_k_values": [
       30,
       50
@@ -248,12 +255,25 @@
   },
   {
     "node_id": "N019",
-    "latitude": 36.484974,
-    "longitude": 127.276813,
-    "x": 980008.563,
-    "y": 1831949.502,
-    "cluster_total_flow": 14564136.2,
-    "included_od_count": 171716,
+    "latitude": 37.814144,
+    "longitude": 127.105559,
+    "x": 965281.876,
+    "y": 1979452.532,
+    "cluster_total_flow": 2042649.4,
+    "included_od_count": 28604,
+    "source_k_values": [
+      20
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N020",
+    "latitude": 37.388674,
+    "longitude": 127.251195,
+    "x": 977975.513,
+    "y": 1932204.655,
+    "cluster_total_flow": 2036037.6,
+    "included_od_count": 24107,
     "source_k_values": [
       30,
       50
@@ -261,39 +281,26 @@
     "merged_count": 2
   },
   {
-    "node_id": "N020",
-    "latitude": 37.223344,
-    "longitude": 127.031016,
-    "x": 958393.858,
-    "y": 1913937.064,
-    "cluster_total_flow": 13126915.6,
-    "included_od_count": 399098,
-    "source_k_values": [
-      30
-    ],
-    "merged_count": 1
-  },
-  {
     "node_id": "N021",
-    "latitude": 37.466766,
-    "longitude": 126.702737,
-    "x": 929498.076,
-    "y": 1941137.695,
-    "cluster_total_flow": 12435053.2,
-    "included_od_count": 462074,
+    "latitude": 37.872675,
+    "longitude": 127.14307,
+    "x": 968608.365,
+    "y": 1985933.259,
+    "cluster_total_flow": 1922006.2,
+    "included_od_count": 33159,
     "source_k_values": [
-      50
+      10
     ],
     "merged_count": 1
   },
   {
     "node_id": "N022",
-    "latitude": 37.531988,
-    "longitude": 126.908758,
-    "x": 947762.14,
-    "y": 1948239.324,
-    "cluster_total_flow": 11794907.8,
-    "included_od_count": 530220,
+    "latitude": 37.380978,
+    "longitude": 127.120925,
+    "x": 966440.331,
+    "y": 1931389.242,
+    "cluster_total_flow": 1888280.0,
+    "included_od_count": 23866,
     "source_k_values": [
       50
     ],
@@ -301,51 +308,53 @@
   },
   {
     "node_id": "N023",
-    "latitude": 37.400494,
-    "longitude": 127.092751,
-    "x": 963955.443,
-    "y": 1933564.813,
-    "cluster_total_flow": 11384642.6,
-    "included_od_count": 425094,
+    "latitude": 37.655698,
+    "longitude": 128.95056,
+    "x": 1127951.876,
+    "y": 1962789.702,
+    "cluster_total_flow": 1693837.0,
+    "included_od_count": 29759,
     "source_k_values": [
-      30
+      10
     ],
     "merged_count": 1
   },
   {
     "node_id": "N024",
-    "latitude": 37.517411,
-    "longitude": 127.046984,
-    "x": 959967.116,
-    "y": 1946554.342,
-    "cluster_total_flow": 10851898.2,
-    "included_od_count": 449338,
+    "latitude": 37.681137,
+    "longitude": 127.229091,
+    "x": 976112.236,
+    "y": 1964656.917,
+    "cluster_total_flow": 1672319.4,
+    "included_od_count": 16792,
     "source_k_values": [
+      30,
       50
     ],
-    "merged_count": 1
+    "merged_count": 2
   },
   {
     "node_id": "N025",
-    "latitude": 36.850422,
-    "longitude": 127.112074,
-    "x": 965416.295,
-    "y": 1872534.651,
-    "cluster_total_flow": 10686148.8,
-    "included_od_count": 214294,
+    "latitude": 38.180026,
+    "longitude": 128.501833,
+    "x": 1087743.893,
+    "y": 2020448.778,
+    "cluster_total_flow": 1619771.4,
+    "included_od_count": 38043,
     "source_k_values": [
-      30
+      10,
+      20
     ],
-    "merged_count": 1
+    "merged_count": 2
   },
   {
     "node_id": "N026",
-    "latitude": 37.244513,
-    "longitude": 127.060521,
-    "x": 961022.369,
-    "y": 1916273.038,
-    "cluster_total_flow": 10457750.2,
-    "included_od_count": 304758,
+    "latitude": 37.322118,
+    "longitude": 127.085455,
+    "x": 963271.537,
+    "y": 1924872.437,
+    "cluster_total_flow": 1536382.0,
+    "included_od_count": 16809,
     "source_k_values": [
       50
     ],
@@ -353,169 +362,53 @@
   },
   {
     "node_id": "N027",
-    "latitude": 35.050714,
-    "longitude": 126.785304,
-    "x": 934822.483,
-    "y": 1673085.538,
-    "cluster_total_flow": 10344702.8,
-    "included_od_count": 353714,
+    "latitude": 37.843858,
+    "longitude": 127.762524,
+    "x": 1023097.753,
+    "y": 1982708.409,
+    "cluster_total_flow": 1526332.2,
+    "included_od_count": 26369,
     "source_k_values": [
-      10
+      30
     ],
     "merged_count": 1
   },
   {
     "node_id": "N028",
-    "latitude": 35.8029,
-    "longitude": 127.077065,
-    "x": 961787.179,
-    "y": 1756355.054,
-    "cluster_total_flow": 9220976.0,
-    "included_od_count": 324592,
+    "latitude": 37.145993,
+    "longitude": 128.204562,
+    "x": 1062569.572,
+    "y": 1905485.347,
+    "cluster_total_flow": 1428042.4,
+    "included_od_count": 37879,
     "source_k_values": [
+      20,
       30,
       50
     ],
-    "merged_count": 2
+    "merged_count": 3
   },
   {
     "node_id": "N029",
-    "latitude": 37.508742,
-    "longitude": 128.309518,
-    "x": 1071545.598,
-    "y": 1945803.912,
-    "cluster_total_flow": 8922918.0,
-    "included_od_count": 390066,
+    "latitude": 37.677757,
+    "longitude": 127.289635,
+    "x": 981450.02,
+    "y": 1964268.31,
+    "cluster_total_flow": 1400863.4,
+    "included_od_count": 18687,
     "source_k_values": [
-      10
+      20
     ],
     "merged_count": 1
   },
   {
     "node_id": "N030",
-    "latitude": 36.695069,
-    "longitude": 127.536526,
-    "x": 1003262.881,
-    "y": 1855231.873,
-    "cluster_total_flow": 8757143.6,
-    "included_od_count": 220529,
-    "source_k_values": [
-      20
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N031",
-    "latitude": 36.804962,
-    "longitude": 127.102441,
-    "x": 964536.525,
-    "y": 1867495.27,
-    "cluster_total_flow": 8498701.6,
-    "included_od_count": 143590,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N032",
-    "latitude": 37.346218,
-    "longitude": 126.885694,
-    "x": 945590.051,
-    "y": 1927642.482,
-    "cluster_total_flow": 8105976.8,
-    "included_od_count": 286761,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N033",
-    "latitude": 36.481154,
-    "longitude": 127.242247,
-    "x": 976911.252,
-    "y": 1831533.437,
-    "cluster_total_flow": 8095737.2,
-    "included_od_count": 127780,
-    "source_k_values": [
-      20
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N034",
-    "latitude": 35.164504,
-    "longitude": 128.479847,
-    "x": 1089234.837,
-    "y": 1685910.639,
-    "cluster_total_flow": 7923279.0,
-    "included_od_count": 239708,
-    "source_k_values": [
-      20
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N035",
-    "latitude": 35.901075,
-    "longitude": 126.976146,
-    "x": 952727.179,
-    "y": 1767287.973,
-    "cluster_total_flow": 7786930.4,
-    "included_od_count": 304495,
-    "source_k_values": [
-      10
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N036",
-    "latitude": 35.865848,
-    "longitude": 128.559258,
-    "x": 1095631.53,
-    "y": 1763772.169,
-    "cluster_total_flow": 7645505.4,
-    "included_od_count": 197095,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N037",
-    "latitude": 37.633512,
-    "longitude": 127.134465,
-    "x": 967747.912,
-    "y": 1959401.513,
-    "cluster_total_flow": 7139478.0,
-    "included_od_count": 287718,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N038",
-    "latitude": 35.874492,
-    "longitude": 126.982515,
-    "x": 953286.354,
-    "y": 1764336.518,
-    "cluster_total_flow": 6770131.2,
-    "included_od_count": 251077,
-    "source_k_values": [
-      20
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N039",
-    "latitude": 36.011142,
-    "longitude": 129.284759,
-    "x": 1160841.557,
-    "y": 1780842.385,
-    "cluster_total_flow": 6705375.4,
-    "included_od_count": 201194,
+    "latitude": 37.483262,
+    "longitude": 129.112942,
+    "x": 1142604.84,
+    "y": 1943890.972,
+    "cluster_total_flow": 1308314.4,
+    "included_od_count": 18704,
     "source_k_values": [
       20,
       30
@@ -523,39 +416,161 @@
     "merged_count": 2
   },
   {
-    "node_id": "N040",
-    "latitude": 37.402898,
-    "longitude": 127.15603,
-    "x": 969557.074,
-    "y": 1933809.118,
-    "cluster_total_flow": 6225583.8,
-    "included_od_count": 222626,
+    "node_id": "N031",
+    "latitude": 37.497213,
+    "longitude": 127.061698,
+    "x": 961256.952,
+    "y": 1944307.31,
+    "cluster_total_flow": 1250913.6,
+    "included_od_count": 17463,
     "source_k_values": [
       50
     ],
     "merged_count": 1
   },
   {
-    "node_id": "N041",
-    "latitude": 35.239308,
-    "longitude": 128.661055,
-    "x": 1105641.229,
-    "y": 1694384.569,
-    "cluster_total_flow": 6147594.4,
-    "included_od_count": 153922,
+    "node_id": "N032",
+    "latitude": 37.04135,
+    "longitude": 127.13267,
+    "x": 967334.05,
+    "y": 1893707.512,
+    "cluster_total_flow": 1025784.6,
+    "included_od_count": 25755,
+    "source_k_values": [
+      20,
+      30
+    ],
+    "merged_count": 2
+  },
+  {
+    "node_id": "N033",
+    "latitude": 37.180849,
+    "longitude": 128.995177,
+    "x": 1132723.304,
+    "y": 1910166.484,
+    "cluster_total_flow": 957665.4,
+    "included_od_count": 22006,
+    "source_k_values": [
+      20,
+      30,
+      50
+    ],
+    "merged_count": 3
+  },
+  {
+    "node_id": "N034",
+    "latitude": 37.48292,
+    "longitude": 127.157205,
+    "x": 969693.391,
+    "y": 1942686.647,
+    "cluster_total_flow": 847229.2,
+    "included_od_count": 13207,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N035",
+    "latitude": 37.850866,
+    "longitude": 127.086606,
+    "x": 963631.644,
+    "y": 1983533.975,
+    "cluster_total_flow": 845943.4,
+    "included_od_count": 12719,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N036",
+    "latitude": 37.498727,
+    "longitude": 127.518533,
+    "x": 1001638.176,
+    "y": 1944385.301,
+    "cluster_total_flow": 739228.2,
+    "included_od_count": 21570,
+    "source_k_values": [
+      30,
+      50
+    ],
+    "merged_count": 2
+  },
+  {
+    "node_id": "N037",
+    "latitude": 37.289814,
+    "longitude": 127.466011,
+    "x": 996987.326,
+    "y": 1921208.698,
+    "cluster_total_flow": 690332.8,
+    "included_od_count": 7574,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N038",
+    "latitude": 37.562771,
+    "longitude": 127.078766,
+    "x": 962798.206,
+    "y": 1951573.695,
+    "cluster_total_flow": 687550.0,
+    "included_od_count": 37065,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N039",
+    "latitude": 38.20753,
+    "longitude": 128.524382,
+    "x": 1089685.095,
+    "y": 2023522.195,
+    "cluster_total_flow": 682410.4,
+    "included_od_count": 14440,
     "source_k_values": [
       30
     ],
     "merged_count": 1
   },
   {
+    "node_id": "N040",
+    "latitude": 37.91027,
+    "longitude": 127.151997,
+    "x": 969409.004,
+    "y": 1990101.429,
+    "cluster_total_flow": 650487.6,
+    "included_od_count": 15263,
+    "source_k_values": [
+      30
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N041",
+    "latitude": 37.28095,
+    "longitude": 128.555577,
+    "x": 1093575.822,
+    "y": 1920746.941,
+    "cluster_total_flow": 585431.8,
+    "included_od_count": 15256,
+    "source_k_values": [
+      20,
+      30
+    ],
+    "merged_count": 2
+  },
+  {
     "node_id": "N042",
-    "latitude": 35.051636,
-    "longitude": 127.88948,
-    "x": 1035518.489,
-    "y": 1673023.626,
-    "cluster_total_flow": 6021978.2,
-    "included_od_count": 245848,
+    "latitude": 37.215434,
+    "longitude": 128.832404,
+    "x": 1118219.643,
+    "y": 1913788.076,
+    "cluster_total_flow": 581090.4,
+    "included_od_count": 13436,
     "source_k_values": [
       10
     ],
@@ -563,92 +578,90 @@
   },
   {
     "node_id": "N043",
-    "latitude": 37.77996,
-    "longitude": 127.124267,
-    "x": 966913.222,
-    "y": 1975653.039,
-    "cluster_total_flow": 5732791.2,
-    "included_od_count": 195945,
+    "latitude": 38.173705,
+    "longitude": 128.56901,
+    "x": 1093635.712,
+    "y": 2019813.153,
+    "cluster_total_flow": 558281.4,
+    "included_od_count": 10563,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N044",
+    "latitude": 37.172629,
+    "longitude": 127.577168,
+    "x": 1006850.521,
+    "y": 1908210.673,
+    "cluster_total_flow": 396830.0,
+    "included_od_count": 14486,
     "source_k_values": [
       30
     ],
     "merged_count": 1
   },
   {
-    "node_id": "N044",
-    "latitude": 37.583735,
-    "longitude": 127.811119,
-    "x": 1027469.094,
-    "y": 1953861.687,
-    "cluster_total_flow": 4707380.8,
-    "included_od_count": 201354,
+    "node_id": "N045",
+    "latitude": 37.042116,
+    "longitude": 127.087796,
+    "x": 963343.853,
+    "y": 1893808.893,
+    "cluster_total_flow": 392486.2,
+    "included_od_count": 8187,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N046",
+    "latitude": 37.626651,
+    "longitude": 127.886379,
+    "x": 1034094.369,
+    "y": 1958647.653,
+    "cluster_total_flow": 370167.6,
+    "included_od_count": 10282,
     "source_k_values": [
       20
     ],
     "merged_count": 1
   },
   {
-    "node_id": "N045",
-    "latitude": 37.28971,
-    "longitude": 127.508961,
-    "x": 1000794.287,
-    "y": 1921196.676,
-    "cluster_total_flow": 4467200.8,
-    "included_od_count": 233766,
-    "source_k_values": [
-      30,
-      50
-    ],
-    "merged_count": 2
-  },
-  {
-    "node_id": "N046",
-    "latitude": 35.223244,
-    "longitude": 128.612394,
-    "x": 1101233.468,
-    "y": 1692552.213,
-    "cluster_total_flow": 4233406.6,
-    "included_od_count": 104952,
+    "node_id": "N047",
+    "latitude": 37.516557,
+    "longitude": 129.079728,
+    "x": 1139606.028,
+    "y": 1947535.398,
+    "cluster_total_flow": 370033.0,
+    "included_od_count": 5144,
     "source_k_values": [
       50
     ],
     "merged_count": 1
   },
   {
-    "node_id": "N047",
-    "latitude": 37.885459,
-    "longitude": 127.74081,
-    "x": 1021175.33,
-    "y": 1987318.871,
-    "cluster_total_flow": 4129486.2,
-    "included_od_count": 163181,
-    "source_k_values": [
-      30,
-      50
-    ],
-    "merged_count": 2
-  },
-  {
     "node_id": "N048",
-    "latitude": 37.034099,
-    "longitude": 127.09102,
-    "x": 963626.755,
-    "y": 1892918.293,
-    "cluster_total_flow": 4117823.6,
-    "included_od_count": 132272,
+    "latitude": 38.1251,
+    "longitude": 127.354667,
+    "x": 987261.814,
+    "y": 2013890.189,
+    "cluster_total_flow": 356148.8,
+    "included_od_count": 12905,
     "source_k_values": [
-      50
+      20
     ],
     "merged_count": 1
   },
   {
     "node_id": "N049",
-    "latitude": 35.261787,
-    "longitude": 128.861047,
-    "x": 1123804.88,
-    "y": 1697108.831,
-    "cluster_total_flow": 3873177.4,
-    "included_od_count": 77395,
+    "latitude": 37.282442,
+    "longitude": 127.627299,
+    "x": 1011284.519,
+    "y": 1920397.946,
+    "cluster_total_flow": 350864.4,
+    "included_od_count": 7861,
     "source_k_values": [
       50
     ],
@@ -656,12 +669,12 @@
   },
   {
     "node_id": "N050",
-    "latitude": 37.847655,
-    "longitude": 127.102102,
-    "x": 964993.393,
-    "y": 1983171.86,
-    "cluster_total_flow": 3456682.6,
-    "included_od_count": 127897,
+    "latitude": 37.391124,
+    "longitude": 127.334875,
+    "x": 985383.443,
+    "y": 1932460.251,
+    "cluster_total_flow": 320608.2,
+    "included_od_count": 5394,
     "source_k_values": [
       50
     ],
@@ -669,142 +682,51 @@
   },
   {
     "node_id": "N051",
-    "latitude": 37.221649,
-    "longitude": 128.018311,
-    "x": 1045983.201,
-    "y": 1913771.836,
-    "cluster_total_flow": 3393840.6,
-    "included_od_count": 156314,
+    "latitude": 37.628794,
+    "longitude": 127.36043,
+    "x": 987684.603,
+    "y": 1958824.434,
+    "cluster_total_flow": 296414.2,
+    "included_od_count": 5313,
     "source_k_values": [
-      30
+      50
     ],
     "merged_count": 1
   },
   {
     "node_id": "N052",
-    "latitude": 34.916907,
-    "longitude": 127.637892,
-    "x": 1012595.569,
-    "y": 1658022.062,
-    "cluster_total_flow": 3170608.8,
-    "included_od_count": 130851,
+    "latitude": 37.211741,
+    "longitude": 127.442877,
+    "x": 994931.537,
+    "y": 1912548.416,
+    "cluster_total_flow": 296327.6,
+    "included_od_count": 7376,
     "source_k_values": [
-      20
+      50
     ],
     "merged_count": 1
   },
   {
     "node_id": "N053",
-    "latitude": 36.848145,
-    "longitude": 128.604,
-    "x": 1098426.302,
-    "y": 1872780.505,
-    "cluster_total_flow": 3042802.8,
-    "included_od_count": 168957,
+    "latitude": 37.776146,
+    "longitude": 127.451245,
+    "x": 995706.466,
+    "y": 1975164.473,
+    "cluster_total_flow": 293421.0,
+    "included_od_count": 7313,
     "source_k_values": [
-      20
+      30
     ],
     "merged_count": 1
   },
   {
     "node_id": "N054",
-    "latitude": 35.857915,
-    "longitude": 128.716389,
-    "x": 1109829.152,
-    "y": 1763057.32,
-    "cluster_total_flow": 3021428.0,
-    "included_od_count": 92958,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N055",
-    "latitude": 36.761972,
-    "longitude": 126.601784,
-    "x": 919830.883,
-    "y": 1863028.784,
-    "cluster_total_flow": 3010141.4,
-    "included_od_count": 112961,
-    "source_k_values": [
-      30
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N056",
-    "latitude": 36.142292,
-    "longitude": 128.318419,
-    "x": 1073630.235,
-    "y": 1794226.014,
-    "cluster_total_flow": 2921452.4,
-    "included_od_count": 113399,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N057",
-    "latitude": 34.861901,
-    "longitude": 127.593394,
-    "x": 1008536.665,
-    "y": 1651917.538,
-    "cluster_total_flow": 2855236.2,
-    "included_od_count": 111400,
-    "source_k_values": [
-      30
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N058",
-    "latitude": 35.951811,
-    "longitude": 126.83007,
-    "x": 939583.621,
-    "y": 1772995.956,
-    "cluster_total_flow": 2810502.2,
-    "included_od_count": 108503,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N059",
-    "latitude": 37.801965,
-    "longitude": 128.803428,
-    "x": 1114747.024,
-    "y": 1978827.999,
-    "cluster_total_flow": 2745486.8,
-    "included_od_count": 115489,
-    "source_k_values": [
-      20
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N060",
-    "latitude": 35.239979,
-    "longitude": 128.052525,
-    "x": 1050271.456,
-    "y": 1693981.153,
-    "cluster_total_flow": 2615413.8,
-    "included_od_count": 112583,
-    "source_k_values": [
-      30
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N061",
-    "latitude": 34.884734,
-    "longitude": 128.546855,
-    "x": 1095662.871,
-    "y": 1654945.421,
-    "cluster_total_flow": 2523597.8,
-    "included_od_count": 89093,
+    "latitude": 37.6079,
+    "longitude": 128.40106,
+    "x": 1079530.842,
+    "y": 1956878.846,
+    "cluster_total_flow": 293000.8,
+    "included_od_count": 14845,
     "source_k_values": [
       30,
       50
@@ -812,13 +734,104 @@
     "merged_count": 2
   },
   {
+    "node_id": "N055",
+    "latitude": 37.437414,
+    "longitude": 129.155139,
+    "x": 1146425.244,
+    "y": 1938868.761,
+    "cluster_total_flow": 289739.2,
+    "included_od_count": 4462,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N056",
+    "latitude": 37.928958,
+    "longitude": 127.213903,
+    "x": 974857.218,
+    "y": 1992156.366,
+    "cluster_total_flow": 289024.2,
+    "included_od_count": 6997,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N057",
+    "latitude": 37.36241,
+    "longitude": 127.810289,
+    "x": 1027476.764,
+    "y": 1929307.062,
+    "cluster_total_flow": 283183.4,
+    "included_od_count": 6803,
+    "source_k_values": [
+      30
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N058",
+    "latitude": 38.132907,
+    "longitude": 127.969574,
+    "x": 1041152.964,
+    "y": 2014850.581,
+    "cluster_total_flow": 245922.8,
+    "included_od_count": 7342,
+    "source_k_values": [
+      30
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N059",
+    "latitude": 37.804739,
+    "longitude": 127.435087,
+    "x": 994285.752,
+    "y": 1978337.706,
+    "cluster_total_flow": 237710.0,
+    "included_od_count": 5482,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N060",
+    "latitude": 38.168185,
+    "longitude": 127.371055,
+    "x": 988704.912,
+    "y": 2018668.634,
+    "cluster_total_flow": 237455.6,
+    "included_od_count": 7970,
+    "source_k_values": [
+      30
+    ],
+    "merged_count": 1
+  },
+  {
+    "node_id": "N061",
+    "latitude": 37.665377,
+    "longitude": 127.837503,
+    "x": 1029766.021,
+    "y": 1962927.49,
+    "cluster_total_flow": 231703.0,
+    "included_od_count": 5511,
+    "source_k_values": [
+      50
+    ],
+    "merged_count": 1
+  },
+  {
     "node_id": "N062",
-    "latitude": 34.874309,
-    "longitude": 127.636884,
-    "x": 1012509.984,
-    "y": 1653298.032,
-    "cluster_total_flow": 2483713.4,
-    "included_od_count": 88948,
+    "latitude": 37.852928,
+    "longitude": 127.835436,
+    "x": 1029509.171,
+    "y": 1983735.293,
+    "cluster_total_flow": 225741.2,
+    "included_od_count": 4565,
     "source_k_values": [
       50
     ],
@@ -826,129 +839,12 @@
   },
   {
     "node_id": "N063",
-    "latitude": 34.656746,
-    "longitude": 126.524928,
-    "x": 910651.588,
-    "y": 1629595.938,
-    "cluster_total_flow": 2300646.4,
-    "included_od_count": 98559,
-    "source_k_values": [
-      20
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N064",
-    "latitude": 36.088144,
-    "longitude": 126.753145,
-    "x": 932762.111,
-    "y": 1788168.132,
-    "cluster_total_flow": 2218993.4,
-    "included_od_count": 103875,
-    "source_k_values": [
-      30
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N065",
-    "latitude": 35.136622,
-    "longitude": 128.108563,
-    "x": 1055440.253,
-    "y": 1682548.56,
-    "cluster_total_flow": 2167366.6,
-    "included_od_count": 78543,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N066",
-    "latitude": 34.725156,
-    "longitude": 126.505058,
-    "x": 908905.734,
-    "y": 1637200.187,
-    "cluster_total_flow": 2152698.6,
-    "included_od_count": 90054,
-    "source_k_values": [
-      30
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N067",
-    "latitude": 36.627134,
-    "longitude": 128.534345,
-    "x": 1092480.841,
-    "y": 1848193.472,
-    "cluster_total_flow": 2040061.0,
-    "included_od_count": 125405,
-    "source_k_values": [
-      30
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N068",
-    "latitude": 37.938197,
-    "longitude": 128.699937,
-    "x": 1105441.557,
-    "y": 1993821.783,
-    "cluster_total_flow": 1937437.0,
-    "included_od_count": 85303,
-    "source_k_values": [
-      30
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N069",
-    "latitude": 36.084007,
-    "longitude": 129.349896,
-    "x": 1166558.618,
-    "y": 1789035.098,
-    "cluster_total_flow": 1857362.8,
-    "included_od_count": 50130,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N070",
-    "latitude": 37.359243,
-    "longitude": 127.952227,
-    "x": 1040047.423,
-    "y": 1929006.507,
-    "cluster_total_flow": 1850641.4,
-    "included_od_count": 69931,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N071",
-    "latitude": 36.712942,
-    "longitude": 126.521465,
-    "x": 912606.352,
-    "y": 1857659.958,
-    "cluster_total_flow": 1636229.2,
-    "included_od_count": 63614,
-    "source_k_values": [
-      50
-    ],
-    "merged_count": 1
-  },
-  {
-    "node_id": "N072",
-    "latitude": 36.643596,
-    "longitude": 128.579682,
-    "x": 1096514.054,
-    "y": 1850064.277,
-    "cluster_total_flow": 1574297.8,
-    "included_od_count": 88671,
+    "latitude": 38.146792,
+    "longitude": 127.308019,
+    "x": 983178.263,
+    "y": 2016304.494,
+    "cluster_total_flow": 215336.0,
+    "included_od_count": 7265,
     "source_k_values": [
       50
     ],

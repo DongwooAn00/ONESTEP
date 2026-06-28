@@ -60,7 +60,7 @@ def test_missing_overburden_and_rock_uses_slope_fallback():
     assert "fallback_slope_based_tunnel_logic" in decision.decision_reason
 
 
-def test_river_crossing_overrides_tunnel():
+def test_river_crossing_is_risk_note_without_bridge_segment():
     decision = evaluate_tunnel_decision(
         TunnelDecisionInput(
             river_crossing=True,
@@ -72,8 +72,8 @@ def test_river_crossing_overrides_tunnel():
         )
     )
 
-    assert decision.final_segment_type == "bridge"
-    assert "bridge_due_to_river_crossing" in decision.decision_reason
+    assert decision.final_segment_type in {"surface_road", "tunnel"}
+    assert "MVP에서는 교량 미반영, 추가 검토 필요" in decision.risk_reasons
 
 
 def test_refrock_substring_granite_maps_to_class_two():

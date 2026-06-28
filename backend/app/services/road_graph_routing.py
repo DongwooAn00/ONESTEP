@@ -8,6 +8,7 @@ from app.db import connect
 from app.schemas.od_candidates import CandidateEdge, CandidateNode
 from app.services import route_mvp_config as config
 from app.services.cost_grid import dem_to_lon_lat, lon_lat_to_dem
+from app.services.region_filter import RegionContext
 from app.services.road_network import RoadAccessPoint, nearest_road_node, to_coordinate, to_road_point
 
 
@@ -43,9 +44,14 @@ class RoadGraphRoute:
     existing_road_length_km: float
     existing_tunnel_length_km: float
     new_surface_road_length_km: float
+    connector_length_km: float
     existing_road_access_length_km: float
     existing_road_access_percent: float
     warnings: list[str]
+    road_nodes_before: int = 0
+    road_nodes_after: int = 0
+    road_edges_before: int = 0
+    road_edges_after: int = 0
 
 
 def _node_lookup(nodes: list[CandidateNode]) -> dict[str, CandidateNode]:
@@ -93,7 +99,12 @@ def _query_corridor_edges(
     edge: CandidateEdge,
     buffer_multiplier: float,
     min_buffer_km: float,
-) -> tuple[dict[str, RoadGraphNode], dict[str, list[RoadGraphEdge]]]:
+    region_context: RegionContext | None = None,
+) -> tuple[
+    dict[str, RoadGraphNode],
+    dict[str, list[RoadGraphEdge]],
+    dict[str, int],
+]:
     straight_distance_m = max(edge.straight_distance_km * 1000.0, _distance_m(
         RoadGraphNode(start.node_id, start.road_x, start.road_y),
         RoadGraphNode(end.node_id, end.road_x, end.road_y),
@@ -136,6 +147,30 @@ def _query_corridor_edges(
                 (min_x, min_y, max_x, max_y),
             )
             rows = cursor.fetchall()
+
+    road_edges_before = len(rows)
+    road_node_ids_before = {
+        str(node_id)
+        for row in rows
+        for node_id in (row[1], row[4])
+    }
+    if region_context is not None and region_context.enabled:
+        filtered_rows = []
+        for row in rows:
+            start_coordinate = to_coordinate(float(row[2]), float(row[3]))
+            end_coordinate = to_coordinate(float(row[5]), float(row[6]))
+            if (
+                region_context.contains_point(
+                    start_coordinate.lon,
+                    start_coordinate.lat,
+                )
+                or region_context.contains_point(
+                    end_coordinate.lon,
+                    end_coordinate.lat,
+                )
+            ):
+                filtered_rows.append(row)
+        rows = filtered_rows
 
     nodes: dict[str, RoadGraphNode] = {}
     adjacency: dict[str, list[RoadGraphEdge]] = {}
@@ -184,7 +219,13 @@ def _query_corridor_edges(
                     geometry_xy=list(reversed(geometry_xy)),
                 )
             )
-    return nodes, adjacency
+    road_edges_after = len(rows)
+    return nodes, adjacency, {
+        "road_nodes_before": len(road_node_ids_before),
+        "road_nodes_after": len(nodes),
+        "road_edges_before": road_edges_before,
+        "road_edges_after": road_edges_after,
+    }
 
 
 def _coordinates_from_multilinestring_wkt(value: str) -> list[tuple[float, float]]:
@@ -402,7 +443,9 @@ def _merge_existing_road_segments(
     current_type = None
     current_geometry: list[dict[str, float]] = []
     for edge in road_path:
-        segment_type = "existing_tunnel" if edge.is_existing_tunnel else "existing_road"
+        # Existing tunnels are part of the baseline road asset. The MVP segment
+        # contract intentionally exposes only existing_road for existing assets.
+        segment_type = "existing_road"
         geometry = _geometry_to_lat_lon(edge.geometry_xy)
         if len(geometry) < 2:
             continue
@@ -436,25 +479,27 @@ def build_road_graph_route(
     route_id: str,
     buffer_multiplier: float = 1.2,
     min_buffer_km: float = 8.0,
+    region_context: RegionContext | None = None,
 ) -> RoadGraphRoute:
     from_node, to_node = _candidate_endpoints(edge, nodes)
     start_access = nearest_road_node(from_node.latitude, from_node.longitude)
     end_access = nearest_road_node(to_node.latitude, to_node.longitude)
-    graph_nodes, adjacency = _query_corridor_edges(
+    graph_nodes, adjacency, graph_stats = _query_corridor_edges(
         start_access,
         end_access,
         edge=edge,
         buffer_multiplier=buffer_multiplier,
         min_buffer_km=min_buffer_km,
+        region_context=region_context,
     )
     road_path = _find_road_path(graph_nodes, adjacency, start_access.node_id, end_access.node_id)
 
     details: list[dict] = []
     start_access_geometry = _access_geometry(from_node, start_access)
     end_access_geometry = _access_geometry(to_node, end_access)
-    _append_segment(details, route_id, "new_surface_road", start_access_geometry)
+    _append_segment(details, route_id, "connector", start_access_geometry)
     _merge_existing_road_segments(route_id, road_path, details)
-    _append_segment(details, route_id, "new_surface_road", list(reversed(end_access_geometry)))
+    _append_segment(details, route_id, "connector", list(reversed(end_access_geometry)))
 
     existing_road_length_km = round(
         sum(item["segment_length_km"] for item in details if item["segment_type"] == "existing_road"),
@@ -468,8 +513,15 @@ def build_road_graph_route(
         sum(item["segment_length_km"] for item in details if item["segment_type"] == "new_surface_road"),
         3,
     )
+    connector_length_km = round(
+        sum(item["segment_length_km"] for item in details if item["segment_type"] == "connector"),
+        3,
+    )
     route_length_km = round(
-        existing_road_length_km + existing_tunnel_length_km + new_surface_road_length_km,
+        existing_road_length_km
+        + existing_tunnel_length_km
+        + new_surface_road_length_km
+        + connector_length_km,
         3,
     )
     existing_access_length = round(existing_road_length_km + existing_tunnel_length_km, 3)
@@ -489,7 +541,9 @@ def build_road_graph_route(
         existing_road_length_km=existing_road_length_km,
         existing_tunnel_length_km=existing_tunnel_length_km,
         new_surface_road_length_km=new_surface_road_length_km,
+        connector_length_km=connector_length_km,
         existing_road_access_length_km=existing_access_length,
         existing_road_access_percent=existing_access_percent,
         warnings=warnings,
+        **graph_stats,
     )

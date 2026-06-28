@@ -7,11 +7,13 @@ from app.schemas.economic import AnalysisRequest, AnalysisResult
 from app.schemas.od_candidates import ODCandidateResult
 from app.schemas.route_cost import EvaluateRouteRequest, EvaluateRouteResult, RouteCostRequest, RouteCostResult
 from app.schemas.route_generation import RouteGenerationRequest, RouteGenerationResult
+from app.schemas.route_reports import CandidateRouteReportsRequest, CandidateRouteReportsResult
 from app.services.candidate_route_pipeline import build_candidate_routes
 from app.services.economic_analysis import analyze_project
 from app.services.od_candidate_generation import build_od_candidates, build_od_candidates_with_supplemental
 from app.services.route_cost import analyze_route_cost, evaluate_route
 from app.services.route_generation import generate_route_candidates
+from app.services.route_report_service import generate_candidate_route_reports
 
 router = APIRouter()
 
@@ -38,7 +40,27 @@ def create_route_generation(payload: RouteGenerationRequest) -> RouteGenerationR
 
 @router.post("/candidate-routes", response_model=CandidateRouteResult)
 def create_candidate_routes(payload: CandidateRouteRequest) -> CandidateRouteResult:
-    return build_candidate_routes(payload.nodes, payload.edges, route_limit=payload.route_limit)
+    try:
+        return build_candidate_routes(
+            payload.nodes,
+            payload.edges,
+            route_limit=payload.route_limit,
+            selected_regions=payload.selected_regions,
+            use_region_filter=payload.use_region_filter,
+            region_buffer_km=payload.region_buffer_km,
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/candidate-routes/reports", response_model=CandidateRouteReportsResult)
+def create_candidate_route_reports(
+    payload: CandidateRouteReportsRequest,
+) -> CandidateRouteReportsResult:
+    try:
+        return generate_candidate_route_reports(payload)
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
 
 
 @router.post("/od-candidates", response_model=ODCandidateResult)
@@ -52,6 +74,9 @@ async def create_od_candidates(
     include_base_od: bool = Form(default=True),
     file: bytes | None = File(default=None),
     supplemental_file: bytes | None = File(default=None),
+    selected_regions: list[str] | None = Form(default=None),
+    use_region_filter: bool = Form(default=False),
+    region_buffer_km: float = Form(default=10.0),
 ) -> ODCandidateResult:
     if top_node_limit < 1 or top_node_limit > 100:
         raise HTTPException(status_code=400, detail="top_node_limit must be between 1 and 100.")
@@ -89,6 +114,9 @@ async def create_od_candidates(
                 edge_limit=edge_limit,
                 min_estimated_flow=min_estimated_flow,
                 sample_size=sample_size,
+                selected_regions=selected_regions,
+                use_region_filter=use_region_filter,
+                region_buffer_km=region_buffer_km,
             )
 
         if file is None:
@@ -101,6 +129,9 @@ async def create_od_candidates(
                 edge_limit=edge_limit,
                 min_estimated_flow=min_estimated_flow,
                 sample_size=sample_size,
+                selected_regions=selected_regions,
+                use_region_filter=use_region_filter,
+                region_buffer_km=region_buffer_km,
             )
 
         return build_od_candidates(
@@ -112,6 +143,9 @@ async def create_od_candidates(
             edge_limit=edge_limit,
             min_estimated_flow=min_estimated_flow,
             sample_size=sample_size,
+            selected_regions=selected_regions,
+            use_region_filter=use_region_filter,
+            region_buffer_km=region_buffer_km,
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error

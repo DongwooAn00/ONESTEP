@@ -131,6 +131,47 @@ brew install gdal
 - `POST /api/analysis`
 - `POST /api/route-cost`
 
+## 법정동 평균 공시지가
+
+`data/processed/csv`에 법정동 코드 CSV를 두고, 프로젝트 루트의 `.env`에
+`VWORLD_API_KEY`, `VWORLD_DOMAIN`을 설정합니다. 실제 키가 들어간 `.env`는
+Git에 포함하지 않습니다.
+
+```python
+from app.services.vworld_land_price import fetch_land_price_summary_by_legal_dong
+
+summary = fetch_land_price_summary_by_legal_dong(
+    stdr_year=2022,
+    req_lvl=3,
+    legal_dong_code="4793025021",
+)
+price = summary["weighted_average_price_krw_per_sqm"]
+```
+
+`legal_dong_code` 대신 CSV의 전체 `legal_dong_name`을 정확히 입력해도 됩니다.
+
+## 행정구역 선택 기반 후보 계산
+
+후보 생성 화면에서 기본값인 `전체 사용`을 해제하면 여러 시도와 경계 여유
+거리(기본 10km)를 선택할 수 있습니다. 선택 구역이 없거나 필터가 꺼져 있으면
+기존 전체 범위 계산을 그대로 사용합니다.
+
+OD 후보 API는 multipart form의 `selected_regions`, `use_region_filter`,
+`region_buffer_km`를 받고, 후보 노선 API는 동일한 이름의 JSON 필드를 받습니다.
+
+```json
+{
+  "selected_regions": ["서울특별시", "경기도"],
+  "use_region_filter": true,
+  "region_buffer_km": 10
+}
+```
+
+응답의 `stats.region_filter_summary` 또는 `region_filter_summary`에서 필터 전후
+OD·후보 노드·도로망 크기, DEM 격자 셀 수, A* 호출 수와 실행 시간을 확인할 수
+있습니다. 현재 MVP 경계는 `backend/app/config/regions.py`의 WGS84 bounding
+box이며 추후 행정구역 polygon으로 교체할 수 있습니다.
+
 ## 데이터 전처리
 
 CSV 전처리:

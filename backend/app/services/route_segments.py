@@ -86,14 +86,11 @@ def _local_relief_m(cells: list[CostCell], index: int, window: int = 3) -> float
 
 def _initial_type(cells: list[CostCell], index: int, start: CostCell, end: CostCell) -> tuple[str, str | None]:
     river_rank = start.river_rank or end.river_rank
-    if river_rank:
-        return "bridge", river_rank
-
     max_slope = max(start.slope_degrees, end.slope_degrees)
     high_relief = _local_relief_m(cells, index) >= 80 and max(start.cost, end.cost) >= 5.0
     if max_slope >= 25 or max_slope >= 20 or high_relief:
         return "tunnel", None
-    return "surface_road", None
+    return "new_surface_road", river_rank
 
 
 def _road_grade_percent(start: CostCell, end: CostCell, length_km: float) -> float | None:
@@ -143,7 +140,9 @@ def _atom_with_decision(cells: list[CostCell], index: int, start: CostCell, end:
             rock_class=rock_class,
             local_relief_m=local_relief,
             slope_deg=max_slope,
-            river_crossing=bool(river_rank),
+            # Bridges are outside this MVP. Water crossings remain a grid
+            # penalty/risk note and never become a bridge segment.
+            river_crossing=False,
             protected_area=start.protected or end.protected,
             urban_area=start.builtup_area or end.builtup_area,
             original_segment_type=original_type,
@@ -153,11 +152,17 @@ def _atom_with_decision(cells: list[CostCell], index: int, start: CostCell, end:
         )
     )
     risk_reasons = list(decision.risk_reasons)
+    if river_rank:
+        risk_reasons.append("MVP에서는 교량 미반영, 추가 검토 필요")
     for cell in (start, end):
         if cell.risk_reasons:
             risk_reasons.extend(cell.risk_reasons)
     return _AtomicSegment(
-        segment_type=decision.final_segment_type,
+        segment_type=(
+            "tunnel"
+            if decision.final_segment_type == "tunnel"
+            else "new_surface_road"
+        ),
         start=start,
         end=end,
         length_km=length_km,
@@ -215,7 +220,7 @@ def _downgrade_short_tunnels(atoms: list[_AtomicSegment]) -> list[_AtomicSegment
         if length_km < 0.3:
             for cursor in range(index, end):
                 atom = result[cursor]
-                result[cursor] = replace(atom, segment_type="surface_road")
+                result[cursor] = replace(atom, segment_type="new_surface_road")
         index = end
     return result
 
@@ -229,7 +234,7 @@ def _merge_tunnel_gaps(atoms: list[_AtomicSegment]) -> list[_AtomicSegment]:
             continue
         gap_start = index
         gap_length_km = 0.0
-        while index < len(result) and result[index].segment_type not in {"tunnel", "bridge"}:
+        while index < len(result) and result[index].segment_type != "tunnel":
             gap_length_km += result[index].length_km
             index += 1
         has_tunnel_before = gap_start > 0 and result[gap_start - 1].segment_type == "tunnel"
@@ -239,10 +244,6 @@ def _merge_tunnel_gaps(atoms: list[_AtomicSegment]) -> list[_AtomicSegment]:
                 atom = result[cursor]
                 result[cursor] = replace(atom, segment_type="tunnel")
     return result
-
-
-def _bridge_min_length_km(rank: str | None) -> float:
-    return config.BRIDGE_MIN_LENGTH_KM.get(rank or "unknown", config.BRIDGE_MIN_LENGTH_KM["unknown"])
 
 
 def _weighted_optional(group: list[_AtomicSegment], attr: str) -> float | None:
@@ -291,12 +292,11 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
     atoms = _merge_tunnel_gaps(_downgrade_short_tunnels(_atomic_segments(cells)))
     if not atoms:
         return {
-            "surface_road_length_km": 0.0,
+            "new_surface_road_length_km": 0.0,
             "tunnel_length_km": 0.0,
-            "bridge_length_km": 0.0,
             "tunnel_segment_count": 0,
-            "bridge_segment_count": 0,
             "segment_details": [],
+            "crossing_review_required": False,
         }
 
     grouped: list[list[_AtomicSegment]] = []
@@ -311,8 +311,6 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
         segment_type = group[0].segment_type
         raw_length_km = sum(atom.length_km for atom in group)
         length_km = raw_length_km
-        if segment_type == "bridge":
-            length_km = max(raw_length_km, _bridge_min_length_km(group[0].river_rank))
         weighted_slope = (
             sum(atom.average_slope * atom.length_km for atom in group) / raw_length_km if raw_length_km else 0.0
         )
@@ -366,10 +364,16 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
         )
 
     return {
-        "surface_road_length_km": round(sum(item.segment_length_km for item in details if item.segment_type == "surface_road"), 3),
+        "new_surface_road_length_km": round(
+            sum(item.segment_length_km for item in details if item.segment_type == "new_surface_road"),
+            3,
+        ),
         "tunnel_length_km": round(sum(item.segment_length_km for item in details if item.segment_type == "tunnel"), 3),
-        "bridge_length_km": round(sum(item.segment_length_km for item in details if item.segment_type == "bridge"), 3),
         "tunnel_segment_count": sum(1 for item in details if item.segment_type == "tunnel"),
-        "bridge_segment_count": sum(1 for item in details if item.segment_type == "bridge"),
         "segment_details": details,
+        "crossing_review_required": any(
+            "MVP에서는 교량 미반영" in reason
+            for item in details
+            for reason in (item.risk_reasons or [])
+        ),
     }

@@ -107,3 +107,46 @@ def test_build_od_candidates_reports_missing_coordinates(tmp_path):
 
     with pytest.raises(ValueError, match="Origin/destination coordinate columns"):
         build_od_candidates(csv_path, "od_without_coordinates.csv", top_node_limit=30, persist_files=False)
+
+
+def test_build_od_candidates_filters_rows_to_selected_regions():
+    source = StringIO(
+        "origin_latitude,origin_longitude,destination_latitude,destination_longitude,total_flow\n"
+        "37.50,126.90,37.58,127.05,100\n"
+        "37.52,126.92,37.60,127.08,90\n"
+        "37.48,126.88,37.56,127.02,80\n"
+        "37.54,126.95,37.62,127.10,70\n"
+        "35.10,129.00,35.25,129.18,1000\n"
+        "35.12,129.02,35.27,129.20,900\n"
+    )
+
+    result = build_od_candidates(
+        source,
+        "mixed_regions.csv",
+        low_impact_prune_percent=None,
+        top_node_limit=100,
+        persist_files=False,
+        selected_regions=["서울특별시", "경기도"],
+        use_region_filter=True,
+        region_buffer_km=10,
+    )
+
+    summary = result.stats.region_filter_summary
+    assert summary["enabled"] is True
+    assert summary["od_rows_before"] == 6
+    assert summary["od_rows_after"] == 4
+    assert result.stats.region_excluded_rows == 2
+    assert all(node.latitude > 37 for node in result.nodes)
+
+
+def test_empty_selected_regions_keep_existing_full_calculation():
+    result = build_od_candidates(
+        ROOT / "backend" / "tests" / "fixtures" / "od_sample_with_coords.csv",
+        "od_sample_with_coords.csv",
+        persist_files=False,
+        selected_regions=[],
+        use_region_filter=True,
+    )
+
+    assert result.stats.region_filter_summary["enabled"] is False
+    assert result.stats.region_excluded_rows == 0

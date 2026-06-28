@@ -3,10 +3,12 @@ from __future__ import annotations
 import csv
 import heapq
 import json
+import logging
 import math
 import os
 import random
 import tempfile
+import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import lru_cache
@@ -14,7 +16,6 @@ from pathlib import Path
 from typing import BinaryIO, Iterable
 
 import numpy as np
-from pyproj import Transformer
 
 os.environ.setdefault("LOKY_MAX_CPU_COUNT", "1")
 
@@ -22,6 +23,9 @@ from sklearn.cluster import KMeans
 from sklearn.neighbors import NearestNeighbors
 
 from app.schemas.od_candidates import CandidateEdge, CandidateNode, ODCandidateResult, ODCandidateStats
+from app.services.region_filter import RegionContext, build_region_context
+
+logger = logging.getLogger(__name__)
 
 ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_OD_CSV = ROOT / "data" / "processed" / "synthetic_admin_dong_od_by_mode.csv"
@@ -214,18 +218,37 @@ def _valid_lat_lon(latitude: float | None, longitude: float | None) -> bool:
 
 
 @lru_cache(maxsize=1)
-def _transformers() -> tuple[Transformer, Transformer]:
-    to_projected = Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True)
-    to_wgs84 = Transformer.from_crs("EPSG:5179", "EPSG:4326", always_xy=True)
-    return to_projected, to_wgs84
+def _transformers():
+    try:
+        from pyproj import Transformer
+    except ImportError:
+        return None
+    return (
+        Transformer.from_crs("EPSG:4326", "EPSG:5179", always_xy=True),
+        Transformer.from_crs("EPSG:5179", "EPSG:4326", always_xy=True),
+    )
 
 
 def _project(lon: float, lat: float) -> tuple[float, float]:
-    return _transformers()[0].transform(lon, lat)
+    transformers = _transformers()
+    if transformers is not None:
+        return transformers[0].transform(lon, lat)
+    reference_latitude = 36.5
+    return (
+        lon * 111_320.0 * math.cos(math.radians(reference_latitude)),
+        lat * 111_320.0,
+    )
 
 
 def _unproject(x: float, y: float) -> tuple[float, float]:
-    return _transformers()[1].transform(x, y)
+    transformers = _transformers()
+    if transformers is not None:
+        return transformers[1].transform(x, y)
+    reference_latitude = 36.5
+    return (
+        x / (111_320.0 * math.cos(math.radians(reference_latitude))),
+        y / 111_320.0,
+    )
 
 
 def _distance_km_xy(a_x: float, a_y: float, b_x: float, b_y: float) -> float:
@@ -271,7 +294,10 @@ def _detect_code_columns(headers: list[str]) -> dict[str, str]:
     }
 
 
-def _load_coordinate_lookup(path: Path = DEFAULT_COORDINATE_CSV) -> dict[str, tuple[float, float]]:
+def _load_coordinate_lookup(
+    path: Path = DEFAULT_COORDINATE_CSV,
+    region_context: RegionContext | None = None,
+) -> dict[str, tuple[float, float]]:
     if not path.exists():
         return {}
 
@@ -288,9 +314,45 @@ def _load_coordinate_lookup(path: Path = DEFAULT_COORDINATE_CSV) -> dict[str, tu
         for row in reader:
             latitude = _to_float(row.get(latitude_column))
             longitude = _to_float(row.get(longitude_column))
-            if _valid_lat_lon(latitude, longitude):
+            if (
+                _valid_lat_lon(latitude, longitude)
+                and (
+                    region_context is None
+                    or not region_context.enabled
+                    or region_context.contains_point(float(longitude), float(latitude))
+                )
+            ):
                 lookup[str(row.get(code_column, "")).strip()] = (latitude, longitude)
         return lookup
+
+
+def _record_in_region(
+    record: ODRecord,
+    row: dict[str, str],
+    code_columns: dict[str, str],
+    region_context: RegionContext | None,
+) -> bool:
+    """OD 양 끝점이 선택 구역 또는 경계 buffer 안에 있는지 확인한다."""
+    if region_context is None or not region_context.enabled:
+        return True
+
+    origin_code = str(row.get(code_columns.get("origin_code", ""), "")).strip()
+    destination_code = str(
+        row.get(code_columns.get("destination_code", ""), "")
+    ).strip()
+    origin_matches = (
+        bool(origin_code) and region_context.contains_code(origin_code)
+    ) or region_context.contains_point(
+        record.origin_longitude,
+        record.origin_latitude,
+    )
+    destination_matches = (
+        bool(destination_code) and region_context.contains_code(destination_code)
+    ) or region_context.contains_point(
+        record.destination_longitude,
+        record.destination_latitude,
+    )
+    return origin_matches and destination_matches
 
 
 def _row_total_flow(row: dict[str, str], flow_columns: list[FlowColumn]) -> float:
@@ -382,10 +444,12 @@ def _read_candidate_records(
     total_rows: int,
     flow_filter_percent: int | None,
     sample_size: int | None,
-) -> tuple[list[ODRecord], int, int, int]:
+    region_context: RegionContext | None = None,
+) -> tuple[list[ODRecord], int, int, int, int]:
     coordinate_excluded = 0
     non_positive_excluded = 0
     valid_seen = 0
+    region_excluded = 0
     heap: list[tuple[float, int, ODRecord]] = []
     records: list[ODRecord] = []
     top_count = max(1, math.ceil(total_rows * flow_filter_percent / 100)) if flow_filter_percent else None
@@ -404,6 +468,9 @@ def _read_candidate_records(
             coordinate_excluded += int(missing_coordinates)
             non_positive_excluded += int(non_positive_flow)
             if record is None:
+                continue
+            if not _record_in_region(record, row, code_columns, region_context):
+                region_excluded += 1
                 continue
 
             valid_seen += 1
@@ -425,7 +492,7 @@ def _read_candidate_records(
         if sample_size and len(records) > sample_size:
             records = random.sample(records, sample_size)
 
-    return records, coordinate_excluded, non_positive_excluded, valid_seen
+    return records, coordinate_excluded, non_positive_excluded, valid_seen, region_excluded
 
 
 def _records_to_points(records: list[ODRecord]) -> tuple[np.ndarray, np.ndarray]:
@@ -585,6 +652,7 @@ def _generate_candidate_edges(
     edge_limit: int,
     min_estimated_flow: float | None,
     sample_size: int | None,
+    region_context: RegionContext | None = None,
 ) -> list[CandidateEdge]:
     node_points = np.asarray([[node.x, node.y] for node in nodes], dtype=np.float64)
     nearest = NearestNeighbors(n_neighbors=1)
@@ -601,6 +669,8 @@ def _generate_candidate_edges(
         for row in reader:
             record, _, _ = _row_to_record(row, flow_columns, coordinate_columns, coordinate_lookup, code_columns)
             if record is None:
+                continue
+            if not _record_in_region(record, row, code_columns, region_context):
                 continue
             processed += 1
             if sample_size and processed > sample_size:
@@ -643,7 +713,11 @@ def _generate_candidate_edges(
             estimated_flow=round(estimated_flow, 3),
             rank=rank,
             od_count=od_count,
-            source="all_od_weighted_kmeans",
+            source=(
+                "region_filtered_od_weighted_kmeans"
+                if region_context and region_context.enabled
+                else "all_od_weighted_kmeans"
+            ),
         )
         for rank, (estimated_flow, from_index, to_index, distance_km, od_count) in enumerate(
             candidates[:edge_limit],
@@ -715,6 +789,9 @@ def build_od_candidates_with_supplemental(
     min_estimated_flow: float | None = None,
     sample_size: int | None = None,
     persist_files: bool = True,
+    selected_regions: list[str] | None = None,
+    use_region_filter: bool = False,
+    region_buffer_km: float = 10.0,
 ) -> ODCandidateResult:
     temporary_path: Path | None = None
     try:
@@ -743,10 +820,16 @@ def build_od_candidates_with_supplemental(
             min_estimated_flow=min_estimated_flow,
             sample_size=sample_size,
             persist_files=persist_files,
+            selected_regions=selected_regions,
+            use_region_filter=use_region_filter,
+            region_buffer_km=region_buffer_km,
         )
         result.stats.total_od_rows = base_total + supplemental_total
         result.stats.coordinate_excluded_rows = base_coordinate_excluded + supplemental_coordinate_excluded
         result.stats.non_positive_flow_excluded_rows = base_non_positive + supplemental_non_positive
+        result.stats.region_filter_summary["od_rows_before"] = (
+            base_total + supplemental_total
+        )
         result.stats.warnings.append(
             f"Scenario OD merge is active: {supplemental_written} supplemental rows were added to "
             f"{base_written} base OD rows before candidate generation."
@@ -779,12 +862,29 @@ def build_od_candidates(
     min_estimated_flow: float | None = None,
     sample_size: int | None = None,
     persist_files: bool = True,
+    selected_regions: list[str] | None = None,
+    use_region_filter: bool = False,
+    region_buffer_km: float = 10.0,
 ) -> ODCandidateResult:
+    started_at = time.perf_counter()
+    region_context = build_region_context(
+        selected_regions,
+        use_region_filter,
+        region_buffer_km,
+    )
+    logger.info(
+        "[RegionFilter] enabled=%s regions=%s buffer_km=%s",
+        region_context.enabled,
+        list(region_context.selected_regions),
+        region_context.buffer_km,
+    )
     active_source = source or DEFAULT_OD_CSV
     active_filter_percent = flow_filter_percent if flow_filter_percent is not None else top_percent
     active_k_values = k_values or DEFAULT_K_VALUES
     total_rows, _, flow_columns, coordinate_columns, code_columns = load_od_data(active_source)
-    coordinate_lookup = _load_coordinate_lookup()
+    coordinate_lookup = _load_coordinate_lookup(
+        region_context=region_context,
+    )
     coordinate_lookup_used = bool(coordinate_lookup) and set(code_columns) == {"origin_code", "destination_code"}
     warnings: list[str] = []
 
@@ -810,7 +910,13 @@ def build_od_candidates(
             "with admin_dong_code, latitude, longitude."
         )
 
-    records, coordinate_excluded_rows, non_positive_rows, valid_rows = _read_candidate_records(
+    (
+        records,
+        coordinate_excluded_rows,
+        non_positive_rows,
+        valid_rows,
+        region_excluded_rows,
+    ) = _read_candidate_records(
         active_source,
         flow_columns,
         coordinate_columns,
@@ -819,6 +925,12 @@ def build_od_candidates(
         total_rows=total_rows,
         flow_filter_percent=active_filter_percent,
         sample_size=sample_size,
+        region_context=region_context,
+    )
+    logger.info(
+        "[RegionFilter] OD rows: %s -> %s",
+        total_rows,
+        valid_rows,
     )
     if sample_size:
         warnings.append(f"Sampling is active: clustering uses up to {sample_size} valid OD rows.")
@@ -831,9 +943,25 @@ def build_od_candidates(
             "Add origin/destination coordinate columns to the OD CSV or ensure "
             "admin_dong_code values match data/processed/admin_dong_coordinates.csv."
         )
+    if region_context.enabled and len(records) < 2:
+        raise ValueError(
+            "선택 구역 내 유효 OD 데이터가 부족합니다. 구역을 추가하거나 "
+            "region_buffer_km를 늘려주세요."
+        )
 
     raw_nodes = _weighted_kmeans_nodes(records, active_k_values)
     merged_nodes = _merge_nearby_nodes(raw_nodes, merge_distance_km)
+    if region_context.enabled:
+        merged_nodes = [
+            node
+            for node in merged_nodes
+            if region_context.contains_point(node.longitude, node.latitude)
+        ]
+        if len(merged_nodes) < 2:
+            raise ValueError(
+                "선택 구역 내 후보 노드가 2개 미만입니다. 구역을 추가하거나 "
+                "region_buffer_km를 늘려주세요."
+            )
     retained_nodes, pruned_node_count = _prune_nodes(merged_nodes, low_impact_prune_percent, top_node_limit)
     edges = _generate_candidate_edges(
         active_source,
@@ -845,6 +973,7 @@ def build_od_candidates(
         edge_limit=edge_limit,
         min_estimated_flow=min_estimated_flow,
         sample_size=sample_size,
+        region_context=region_context,
     )
 
     if coordinate_excluded_rows:
@@ -853,6 +982,11 @@ def build_od_candidates(
         warnings.append(f"{non_positive_rows} rows with non-positive total_flow were excluded.")
     if not edges:
         warnings.append("No candidate edge satisfied the distance and estimated_flow filters.")
+    if region_context.enabled:
+        warnings.append(
+            f"행정구역 필터 적용: {', '.join(region_context.selected_regions)} "
+            f"(경계 여유 {region_context.buffer_km:g}km)"
+        )
 
     result_files = {}
     if persist_files:
@@ -860,6 +994,22 @@ def build_od_candidates(
             "candidate_nodes.json": _write_json("candidate_nodes.json", [node.model_dump() for node in retained_nodes]),
             "candidate_edges.json": _write_json("candidate_edges.json", [edge.model_dump() for edge in edges]),
         }
+
+    elapsed_seconds = round(time.perf_counter() - started_at, 3)
+    region_summary = region_context.summary(
+        od_rows_before=total_rows,
+        od_rows_after=valid_rows,
+        candidate_coordinates_before=(valid_rows + region_excluded_rows) * 2,
+        candidate_coordinates_after=valid_rows * 2,
+        candidate_nodes_after=len(retained_nodes),
+        candidate_edges_after=len(edges),
+    )
+    logger.info(
+        "[RegionFilter] candidate coordinates: %s -> %s",
+        region_summary["candidate_coordinates_before"],
+        region_summary["candidate_coordinates_after"],
+    )
+    logger.info("[Pipeline] od_candidates elapsed_seconds=%s", elapsed_seconds)
 
     stats = ODCandidateStats(
         source_name=source_name,
@@ -886,6 +1036,9 @@ def build_od_candidates(
         flow_weights={item.column: item.weight for item in flow_columns},
         coordinate_columns=coordinate_columns,
         coordinate_lookup_used=coordinate_lookup_used,
+        region_excluded_rows=region_excluded_rows,
+        region_filter_summary=region_summary,
+        elapsed_seconds=elapsed_seconds,
         result_files=result_files,
         warnings=warnings,
     )

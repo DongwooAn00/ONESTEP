@@ -10,6 +10,7 @@ from app.schemas.od_candidates import CandidateEdge, CandidateNode
 from app.services import route_mvp_config as config
 from app.services.road_network import ROAD_PROJ4
 from app.services.route_cost import DEM_PROJ4
+from app.services.region_filter import RegionContext
 
 
 @dataclass(frozen=True)
@@ -206,28 +207,41 @@ class PostgisDemProvider:
             return None
 
     def elevations(self, points: list[ProjectedPoint]) -> list[float | None]:
-        values: list[float | None] = []
+        if not points:
+            return []
+        xs = [point.x for point in points]
+        ys = [point.y for point in points]
         with connect() as connection:
             with connection.cursor() as cursor:
-                for point in points:
-                    cursor.execute(
-                        """
-                        WITH input_point AS (
-                            SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100002) AS geom
-                        )
-                        SELECT ST_Value(dem_elevation.rast, 1, input_point.geom) AS elevation_m
-                        FROM dem_elevation, input_point
-                        WHERE ST_Intersects(dem_elevation.rast, input_point.geom)
-                        LIMIT 1;
-                        """,
-                        (point.x, point.y),
+                cursor.execute(
+                    """
+                    WITH input_points AS (
+                        SELECT
+                            ordinality AS point_index,
+                            ST_SetSRID(ST_MakePoint(x, y), 100002) AS geom
+                        FROM unnest(
+                            %s::double precision[],
+                            %s::double precision[]
+                        ) WITH ORDINALITY AS points(x, y, ordinality)
                     )
-                    row = cursor.fetchone()
-                    if row is None or row[0] is None or float(row[0]) == -9999:
-                        values.append(None)
-                    else:
-                        values.append(float(row[0]))
-        return values
+                    SELECT (
+                        SELECT ST_Value(dem_elevation.rast, 1, input_points.geom)
+                        FROM dem_elevation
+                        WHERE ST_Intersects(dem_elevation.rast, input_points.geom)
+                        LIMIT 1
+                    ) AS elevation_m
+                    FROM input_points
+                    ORDER BY point_index;
+                    """,
+                    (xs, ys),
+                )
+                rows = cursor.fetchall()
+        return [
+            None
+            if row is None or row[0] is None or float(row[0]) == -9999
+            else float(row[0])
+            for row in rows
+        ]
 
 
 def _table_exists(table_name: str) -> bool:
@@ -322,7 +336,7 @@ def _calculate_slopes(cells: list[list[CostCell]], cell_size_m: float) -> None:
 def _apply_optional_rivers(grid: CostGrid) -> None:
     table = _find_existing_table(["rivers", "river_lines", "waterways", "streams"])
     if table is None:
-        grid.warnings.append("하천/수계 레이어가 없어 교량 구간과 하천 회피 비용을 반영하지 못했습니다.")
+        grid.warnings.append("하천/수계 레이어가 없어 하천·계곡 회피 위험 패널티를 반영하지 못했습니다.")
         return
 
     try:
@@ -419,13 +433,75 @@ def _apply_optional_protected_areas_legacy(grid: CostGrid) -> None:
         grid.warnings.append(f"보호구역/시가지 비용 보정을 건너뜁니다: {error}")
 
 
+@lru_cache(maxsize=1)
+def _population_urban_index() -> tuple[dict[tuple[int, int], list[tuple[float, float, int]]], float]:
+    """Build a coarse spatial index from administrative population centers."""
+    radius = config.URBAN_POPULATION_RADIUS_M
+    buckets: dict[tuple[int, int], list[tuple[float, float, int]]] = {}
+    with connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT representative_lon, representative_lat, population
+                FROM admin_dongs
+                WHERE representative_lon IS NOT NULL
+                  AND representative_lat IS NOT NULL
+                  AND population > 0;
+                """
+            )
+            rows = cursor.fetchall()
+    for longitude, latitude, population in rows:
+        point = lon_lat_to_dem(float(longitude), float(latitude))
+        key = (math.floor(point.x / radius), math.floor(point.y / radius))
+        buckets.setdefault(key, []).append((point.x, point.y, int(population)))
+    return buckets, radius
+
+
+def _apply_population_urban_penalty(grid: CostGrid) -> bool:
+    """Penalize populated urban areas when polygon/building layers are absent."""
+    try:
+        buckets, radius = _population_urban_index()
+    except Exception as error:
+        grid.warnings.append(f"행정동 인구 기반 시가지 회피 비용을 반영하지 못했습니다: {error}")
+        return False
+    if not buckets:
+        return False
+
+    radius_squared = radius * radius
+    for row_cells in grid.cells:
+        for cell in row_cells:
+            bucket_x = math.floor(cell.x / radius)
+            bucket_y = math.floor(cell.y / radius)
+            nearby_population = 0
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for x, y, population in buckets.get((bucket_x + dx, bucket_y + dy), ()):
+                        if (x - cell.x) ** 2 + (y - cell.y) ** 2 <= radius_squared:
+                            nearby_population += population
+
+            if nearby_population >= config.URBAN_POPULATION_HIGH:
+                cell.cost *= config.URBAN_POPULATION_HIGH_MULTIPLIER
+                cell.builtup_area = True
+            elif nearby_population >= config.URBAN_POPULATION_MEDIUM:
+                cell.cost *= config.URBAN_POPULATION_MEDIUM_MULTIPLIER
+                cell.builtup_area = True
+            elif nearby_population >= config.URBAN_POPULATION_LOW:
+                cell.cost *= config.URBAN_POPULATION_LOW_MULTIPLIER
+                cell.builtup_area = True
+    grid.warnings.append(
+        "시가지 폴리곤이 없어 행정동 인구 밀도 기반 회피 패널티를 적용했습니다."
+    )
+    return True
+
+
 def _apply_optional_protected_areas(grid: CostGrid) -> None:
     protected_table = _find_existing_table(["protected_areas"])
     building_table = _find_existing_table(["building_footprints"])
     builtup_table = _find_existing_table(["builtup_areas", "urban_areas"])
 
     if protected_table is None and building_table is None and builtup_table is None:
-        grid.warnings.append("건물/시가지 레이어가 없어 건물 및 시가지 회피 비용을 반영하지 못했습니다.")
+        if not _apply_population_urban_penalty(grid):
+            grid.warnings.append("건물/시가지 레이어가 없어 시가지 회피 비용을 반영하지 못했습니다.")
         return
 
     try:
@@ -528,6 +604,8 @@ def build_cost_grid(
     cell_size_m: float = config.DEFAULT_GRID_CELL_SIZE_M,
     dem_provider: DemProvider | None = None,
     apply_optional_layers: bool = True,
+    apply_existing_road_bias: bool = False,
+    region_context: RegionContext | None = None,
 ) -> tuple[CostGrid, ProjectedPoint, ProjectedPoint]:
     start, end = _edge_points(edge, nodes)
     straight_distance_m = max(edge.straight_distance_km * 1000.0, math.hypot(end.x - start.x, end.y - start.y))
@@ -536,6 +614,26 @@ def build_cost_grid(
     max_x = max(start.x, end.x) + buffer_m
     min_y = min(start.y, end.y) - buffer_m
     max_y = max(start.y, end.y) + buffer_m
+    if region_context is not None and region_context.enabled:
+        envelope = region_context.envelope
+        if envelope is not None:
+            region_corners = [
+                lon_lat_to_dem(lon, lat)
+                for lon, lat in (
+                    (envelope.min_lon, envelope.min_lat),
+                    (envelope.min_lon, envelope.max_lat),
+                    (envelope.max_lon, envelope.min_lat),
+                    (envelope.max_lon, envelope.max_lat),
+                )
+            ]
+            min_x = max(min_x, min(point.x for point in region_corners))
+            max_x = min(max_x, max(point.x for point in region_corners))
+            min_y = max(min_y, min(point.y for point in region_corners))
+            max_y = min(max_y, max(point.y for point in region_corners))
+            if min_x >= max_x or min_y >= max_y:
+                raise ValueError(
+                    "후보 연결쌍이 선택 행정구역의 경계 여유 범위 밖에 있습니다."
+                )
     active_cell_size = _adaptive_cell_size(max_x - min_x, max_y - min_y, cell_size_m)
     active_provider = dem_provider or PostgisDemProvider()
     dem_resolution_m = active_provider.resolution_m() if hasattr(active_provider, "resolution_m") else None
@@ -572,6 +670,67 @@ def build_cost_grid(
 
     if apply_optional_layers:
         _apply_optional_rivers(grid)
-        _apply_optional_roads(grid)
+        if apply_existing_road_bias:
+            _apply_optional_roads(grid)
         _apply_optional_protected_areas(grid)
     return grid, start, end
+
+
+def generate_dem_route_grid(
+    start_lat: float,
+    start_lon: float,
+    end_lat: float,
+    end_lon: float,
+    *,
+    candidate_id: str = "DEM",
+    buffer_multiplier: float = 0.3,
+    min_buffer_km: float = 5.0,
+    cell_size_m: float = config.DEFAULT_GRID_CELL_SIZE_M,
+    dem_provider: DemProvider | None = None,
+    apply_optional_layers: bool = True,
+    region_context: RegionContext | None = None,
+) -> tuple[CostGrid, ProjectedPoint, ProjectedPoint]:
+    """Build an independent DEM grid for a new link between arbitrary points.
+
+    Existing roads deliberately do not receive a low-cost bias here. They are
+    used by baseline/hybrid assembly, not as a substitute for a new alignment.
+    """
+    start_node = CandidateNode(
+        node_id=f"{candidate_id}-START",
+        latitude=start_lat,
+        longitude=start_lon,
+        cluster_total_flow=0,
+        included_od_count=0,
+    )
+    end_node = CandidateNode(
+        node_id=f"{candidate_id}-END",
+        latitude=end_lat,
+        longitude=end_lon,
+        cluster_total_flow=0,
+        included_od_count=0,
+    )
+    projected_start = lon_lat_to_dem(start_lon, start_lat)
+    projected_end = lon_lat_to_dem(end_lon, end_lat)
+    straight_distance_km = math.hypot(
+        projected_end.x - projected_start.x,
+        projected_end.y - projected_start.y,
+    ) / 1000.0
+    edge = CandidateEdge(
+        edge_id=candidate_id,
+        from_node_id=start_node.node_id,
+        to_node_id=end_node.node_id,
+        straight_distance_km=straight_distance_km,
+        estimated_flow=0,
+        rank=1,
+    )
+    return build_cost_grid(
+        edge,
+        [start_node, end_node],
+        buffer_multiplier=buffer_multiplier,
+        min_buffer_km=min_buffer_km,
+        cell_size_m=cell_size_m,
+        dem_provider=dem_provider,
+        apply_optional_layers=apply_optional_layers,
+        apply_existing_road_bias=False,
+        region_context=region_context,
+    )

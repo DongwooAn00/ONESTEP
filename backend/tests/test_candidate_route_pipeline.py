@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 from app.schemas.od_candidates import CandidateEdge, CandidateNode
 from app.services.candidate_route_pipeline import build_candidate_routes
+from app.services import candidate_route_pipeline, cost_grid
 from app.services.cost_model import calculate_route_costs
 from app.services.route_economics import rank_candidate_routes
 
@@ -68,6 +71,7 @@ def test_candidate_routes_run_for_three_sample_edges():
     assert all(route["status"] == "success" for route in result["routes"])
     assert result["segments"]
     assert result["costs"]
+    assert result["region_filter_summary"]["enabled"] is False
 
 
 def test_candidate_route_marks_dem_missing_as_failed():
@@ -99,19 +103,71 @@ def test_segment_lengths_are_close_to_route_length():
     segment_total = (
         cost["surface_road_length_km"]
         + cost["tunnel_length_km"]
-        + cost["bridge_length_km"]
     )
     assert abs(segment_total - route["route_length_km"]) <= 0.6
 
 
 def test_cost_model_outputs_eok_units():
-    costs = calculate_route_costs(surface_road_length_km=1.0, tunnel_length_km=1.0, bridge_length_km=1.0)
+    costs = calculate_route_costs(
+        new_surface_road_length_km=1.0,
+        tunnel_length_km=1.0,
+        connector_length_km=0.5,
+        land_compensation_cost_eok=10.0,
+    )
 
     assert costs["surface_road_cost"] == 184.0
-    assert costs["bridge_cost"] == 601.0
+    assert costs["connector_cost"] == 92.0
+    assert "bridge_cost" not in costs
     assert costs["tunnel_cost"] > 0
+    assert costs["land_compensation_cost"] == 10.0
     assert costs["cost_assumptions"]["unit"] == "eok_krw"
     assert costs["total_screen_cost"] > costs["total_direct_cost"]
+
+
+def test_land_compensation_is_added_after_route_generation(monkeypatch):
+    class DummyParcelRepository:
+        pass
+
+    monkeypatch.setattr(
+        candidate_route_pipeline,
+        "_project_route_geometry",
+        lambda route_geometry: object(),
+    )
+    monkeypatch.setattr(
+        candidate_route_pipeline,
+        "estimate_land_compensation",
+        lambda route_geom, road_width_m, repository: {
+            "total_land_compensation": 100_000_000.0,
+            "factor": 1.5,
+            "road_width_m": road_width_m,
+            "parcel_count": 1,
+            "official_count": 1,
+            "estimated_count": 0,
+            "source_counts": {"official": 1},
+            "items": [],
+            "warnings": [],
+        },
+    )
+
+    result = build_candidate_routes(
+        _nodes(),
+        _edges()[:1],
+        route_limit=1,
+        dem_provider=FlatDemProvider(),
+        apply_optional_layers=False,
+        persist_files=False,
+        parcel_repository=DummyParcelRepository(),
+    )
+
+    cost = result["costs"][0]
+    construction_only = calculate_route_costs(
+        new_surface_road_length_km=cost["surface_road_length_km"],
+        tunnel_length_km=cost["tunnel_length_km"],
+        connector_length_km=cost["connector_length_km"],
+    )
+    assert cost["land_compensation_cost"] == 1.0
+    assert cost["total_direct_cost"] == construction_only["total_direct_cost"] + 1.0
+    assert cost["total_screen_cost"] == construction_only["total_screen_cost"] + 1.0
 
 
 def test_ranked_candidate_routes_sort_by_economic_score():
@@ -125,8 +181,8 @@ def test_ranked_candidate_routes_sort_by_economic_score():
             "total_screen_cost": 100,
             "route_length_km": 10,
             "surface_road_length_km": 10,
+            "new_surface_road_length_km": 10,
             "tunnel_length_km": 0,
-            "bridge_length_km": 0,
             "status": "success",
             "failed_reason": None,
         },
@@ -139,8 +195,8 @@ def test_ranked_candidate_routes_sort_by_economic_score():
             "total_screen_cost": 500,
             "route_length_km": 10,
             "surface_road_length_km": 10,
+            "new_surface_road_length_km": 10,
             "tunnel_length_km": 0,
-            "bridge_length_km": 0,
             "status": "success",
             "failed_reason": None,
         },
@@ -150,3 +206,148 @@ def test_ranked_candidate_routes_sort_by_economic_score():
 
     assert ranked[0]["economic_score"] >= ranked[1]["economic_score"]
     assert ranked == sorted(ranked, key=lambda route: route["economic_score"], reverse=True)
+
+
+def test_result_contract_contains_candidates_and_best_candidate():
+    result = build_candidate_routes(
+        _nodes(),
+        _edges()[:1],
+        route_limit=1,
+        dem_provider=FlatDemProvider(),
+        apply_optional_layers=False,
+        persist_files=False,
+    )
+
+    assert result["candidates"] == result["routes"]
+    assert result["best_candidate"]["route_type"] == "new_direct"
+    assert result["route"] == result["best_candidate"]
+    assert "bridge_length_km" not in result["costs"][0]
+    assert "bridge_cost" not in result["costs"][0]
+    assert {
+        segment["segment_type"] for segment in result["segments"]
+    } <= {"existing_road", "connector", "new_surface_road", "tunnel"}
+
+
+def test_existing_baseline_does_not_prevent_new_and_hybrid_candidates(monkeypatch):
+    geometry = [
+        {"lat": 36.50 + index * 0.007, "lon": 127.00 + index * 0.011}
+        for index in range(9)
+    ]
+    monkeypatch.setattr(
+        candidate_route_pipeline,
+        "build_road_graph_route",
+        lambda *args, **kwargs: SimpleNamespace(
+            route_geometry=geometry,
+            route_length_km=9.0,
+            existing_road_length_km=8.4,
+            existing_tunnel_length_km=0.0,
+            new_surface_road_length_km=0.0,
+            connector_length_km=0.6,
+            segment_details=[
+                {
+                    "route_id": "R001-B",
+                    "segment_id": "R001-B-S001",
+                    "segment_type": "connector",
+                    "segment_length_km": 0.3,
+                    "segment_geometry": geometry[:2],
+                    "average_slope": 0.0,
+                    "max_slope": 0.0,
+                },
+                {
+                    "route_id": "R001-B",
+                    "segment_id": "R001-B-S002",
+                    "segment_type": "existing_road",
+                    "segment_length_km": 8.4,
+                    "segment_geometry": geometry[1:-1],
+                    "average_slope": 0.0,
+                    "max_slope": 0.0,
+                },
+                {
+                    "route_id": "R001-B",
+                    "segment_id": "R001-B-S003",
+                    "segment_type": "connector",
+                    "segment_length_km": 0.3,
+                    "segment_geometry": geometry[-2:],
+                    "average_slope": 0.0,
+                    "max_slope": 0.0,
+                },
+            ],
+            existing_road_access_length_km=8.4,
+            existing_road_access_percent=93.3,
+            warnings=[],
+            road_nodes_before=20,
+            road_nodes_after=20,
+            road_edges_before=30,
+            road_edges_after=30,
+        ),
+    )
+    original_grid_builder = cost_grid.generate_dem_route_grid
+
+    def build_grid_without_database_layers(*args, **kwargs):
+        kwargs["apply_optional_layers"] = False
+        return original_grid_builder(*args, **kwargs)
+
+    monkeypatch.setattr(
+        candidate_route_pipeline,
+        "generate_dem_route_grid",
+        build_grid_without_database_layers,
+    )
+
+    result = build_candidate_routes(
+        _nodes(),
+        _edges()[:1],
+        route_limit=3,
+        dem_provider=FlatDemProvider(),
+        apply_optional_layers=True,
+        persist_files=False,
+    )
+
+    route_types = {route["route_type"] for route in result["candidates"]}
+    assert "existing_baseline" in route_types
+    assert "new_direct" in route_types
+    assert "hybrid_new_existing" in route_types
+    assert "bypass_improvement" in route_types
+    assert all(route["route_type"] != "existing_baseline" for route in result["ranked_routes"])
+    assert len(result["ranked_routes"]) == 3
+
+
+def test_population_fallback_penalizes_urban_cells(monkeypatch):
+    radius = cost_grid.config.URBAN_POPULATION_RADIUS_M
+    monkeypatch.setattr(
+        cost_grid,
+        "_population_urban_index",
+        lambda: ({(0, 0): [(100.0, 100.0, 40_000)]}, radius),
+    )
+    urban = cost_grid.CostCell(
+        row=0,
+        col=0,
+        x=0.0,
+        y=0.0,
+        lon=127.0,
+        lat=37.0,
+        elevation_m=100.0,
+        cost=1.0,
+    )
+    rural = cost_grid.CostCell(
+        row=0,
+        col=1,
+        x=radius * 4,
+        y=radius * 4,
+        lon=127.2,
+        lat=37.2,
+        elevation_m=100.0,
+        cost=1.0,
+    )
+    grid = cost_grid.CostGrid(
+        cells=[[urban, rural]],
+        cell_size_m=500.0,
+        origin_x=0.0,
+        origin_y=0.0,
+        warnings=[],
+    )
+
+    assert cost_grid._apply_population_urban_penalty(grid) is True
+    assert urban.builtup_area is True
+    assert urban.cost == cost_grid.config.URBAN_POPULATION_HIGH_MULTIPLIER
+    assert rural.builtup_area is False
+    assert rural.cost == 1.0
