@@ -224,7 +224,7 @@ DEM 기반 신규 도로/터널 경로 탐색 방식:
 - connector: 후보 정점에서 기존 도로망까지 연결하는 접속 구간
 - new_surface_road: DEM 기반 신규 지상도로 구간
 - tunnel: DEM 경로 중 터널로 최종 판정된 구간
-- bridge segment는 현재 결과 contract와 테스트에서 제외되어 있다. 하천 통과는 risk_reasons와 crossing_review_required로 표시되며 교량비는 계산하지 않는다.
+- river_crossing 구간은 bridge가 tunnel보다 우선하며 결과 contract와 지도에 길이·개수가 포함된다. 다만 전용 교량비 모델은 없어 후보 스크리닝 비용에서는 도로 단가를 적용하고, 상세 보고서에서는 별도 검토 경고를 남긴다.
 
 후보 노선별 거리, 시간, 비용, 편익 계산 방식:
 - 거리: segment 길이를 합산하거나 DEM cell 간 거리를 합산한다.

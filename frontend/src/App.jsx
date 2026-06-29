@@ -593,7 +593,8 @@ function RouteMap({
         new_surface_road: { color: "#f59e0b", weight: 6, opacity: 0.9, style: "solid" },
         connector: { color: "#eab308", weight: 5, opacity: 0.88, style: "shortdash" },
         existing_road: { color: "#1f9d55", weight: 4, opacity: 0.78, style: "solid" },
-        tunnel: { color: "#7f57d9", weight: 6, opacity: 0.9, style: "shortdash" }
+        tunnel: { color: "#7f57d9", weight: 6, opacity: 0.9, style: "shortdash" },
+        bridge: { color: "#14a8b5", weight: 6, opacity: 0.9, style: "shortdash" }
       }[segment.segment_type] || { color: "#0b7ff3", weight: 5, opacity: 0.82, style: "solid" };
 
       const maxMapPoints = 300;
@@ -1005,7 +1006,9 @@ function RouteReportDialog({ state, onClose }) {
                 {report.limitations?.length > 0 && (
                   <ul>{report.limitations.map((item) => <li key={item}>{item}</li>)}</ul>
                 )}
-                <p className="report-scope-note">교량 분석은 이번 MVP 범위에서 제외됩니다.</p>
+                <p className="report-scope-note">
+                  교량은 하천 교차 시 예비 구간으로 분류하지만, 전용 형식·공사비 산정은 추가 검토가 필요합니다.
+                </p>
               </section>
               <section className="report-section">
                 <h3>6. 종합 검토 의견</h3>
@@ -2343,6 +2346,8 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
             신설도로
             <span className="legend tunnel" />
             터널
+            <span className="legend bridge" />
+            교량
           </div>
           <RouteMap
             routes={[]}
@@ -2388,6 +2393,10 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
               <span>
                 터널 구간
                 <strong>{formatNumber(routeSegments.filter((segment) => segment.segment_type === "tunnel").length)}</strong>
+              </span>
+              <span>
+                교량 구간
+                <strong>{formatNumber(routeSegments.filter((segment) => segment.segment_type === "bridge").length)}</strong>
               </span>
               <span>
                 실패

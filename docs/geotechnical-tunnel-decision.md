@@ -18,6 +18,14 @@ boundary_gdf = gpd.read_file("Geology_250K_Boudary.shp")
 
 All route, DEM, and geology geometry should be transformed to a meter CRS before distance checks. The default target CRS is `EPSG:5179`.
 
+The candidate-route pipeline searches `data/raw/**/Geology_250K_Litho.shp`
+automatically, so the supplied Korean directory name does not have to be
+renamed. `GEOLOGY_DATA_DIR` can override the directory. The three datasets are
+cached after the first GeoPandas load. Potential tunnel runs are sampled every
+20 m, including both endpoints, and transformed from the DEM CRS to
+`EPSG:5179`. If PostGIS geology tables are absent, these Shapefiles are used
+directly instead of silently treating every rock class as unknown.
+
 ## Overburden
 
 Overburden is calculated from DEM surface elevation and the planned tunnel profile:
@@ -27,6 +35,11 @@ overburden_m = surface_elev_m - tunnel_elev_m
 ```
 
 The planned tunnel elevation is linearly interpolated from segment start profile elevation to segment end profile elevation. Negative overburden is not clamped; it is reported with `negative_overburden_check_dem_or_profile`.
+
+The active pipeline first identifies potential tunnel runs from road grade,
+DEM slope, or local relief. It then bulk-queries DEM elevations for the 20 m
+samples and aggregates the samples back to route cells used by the segment
+classifier.
 
 ## Estimated Rock Class
 
@@ -97,6 +110,15 @@ score < 30: surface_preferred
 
 For candidate ranges, tunnel is allowed when `tunnel_cost <= surface_cost * 1.10`. Low overburden keeps `low_overburden_cut_and_cover_or_surface_preferred` instead of confirming a normal NATM tunnel. Protected-area direct conflicts are flagged as `avoid_or_reroute`.
 
+The final route-level tunnel construction cost is the sum of each tunnel
+segment cost. Each segment therefore uses its own `estimated_rock_class`
+ground factor; the unknown fallback remains `1.30`.
+
+River crossings are emitted as `bridge` before tunnel evaluation. Bridge
+length and count are returned, but a dedicated bridge unit-cost model is not
+yet implemented; the current screening cost charges bridge length with the
+surface-road unit cost and adds a detailed-review warning.
+
 ## Fallback
 
 Fallback order:
@@ -122,4 +144,12 @@ estimated_surface_cost_eok, estimated_tunnel_cost_eok, decision_reason,
 risk_reasons
 ```
 
-`ranked_candidate_routes.json` summary now includes tunnel totals, counts, length by rock class, high-risk tunnel length, low-overburden tunnel length, very-poor-rock tunnel length, average tunnel score, and maximum ground factor.
+`ranked_candidate_routes.json` summary now includes tunnel totals, tunnel and
+bridge counts, length by rock class, high-risk tunnel length, low-overburden
+tunnel length, very-poor-rock tunnel length, average tunnel score, and maximum
+ground factor.
+
+`backend/app/services/route_cost.py` remains the backward-compatible manual
+profile endpoint. Its old slope thresholds are retained for existing clients;
+the OD candidate-route flow uses `route_segments.py` and the geotechnical
+decision described above.

@@ -32,11 +32,13 @@ class CostCell:
     slope_degrees: float = 0.0
     cost: float = 1.0
     river_rank: str | None = None
+    river_crossing: bool = False
     road_rank: str | None = None
     road_distance_m: float | None = None
     protected: bool = False
     building: bool = False
     builtup_area: bool = False
+    urban_area: bool = False
     overburden_m: float | None = None
     estimated_rock_class: str | None = None
     rock_class: str | None = None
@@ -463,6 +465,7 @@ def _apply_optional_rivers(grid: CostGrid) -> None:
             if result[1] is not None:
                 rank = _normalize_river_rank(result[1])
                 cell.river_rank = rank
+                cell.river_crossing = True
                 cell.cost *= config.RIVER_MULTIPLIERS.get(rank, 10.0)
     except Exception as error:
         grid.warnings.append(f"하천 데이터 반영을 건너뜁니다: {error}")

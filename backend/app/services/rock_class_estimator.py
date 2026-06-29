@@ -48,9 +48,32 @@ class EstimatedRockClass:
     risk_reasons: list[str] = field(default_factory=list)
 
 
+def normalize_refrock_text(refrock: object | None) -> str:
+    if refrock is None:
+        return ""
+    if isinstance(refrock, bytes):
+        for encoding in ("utf-8", "cp949", "euc-kr"):
+            try:
+                return refrock.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return refrock.decode("utf-8", errors="replace")
+
+    text = str(refrock)
+    # Some DBF/GDAL combinations expose UTF-8 bytes as Latin-1 code points.
+    # Recover the original Korean text before substring matching.
+    try:
+        recovered = text.encode("latin1").decode("utf-8")
+        if any("\uac00" <= character <= "\ud7a3" for character in recovered):
+            return recovered
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        pass
+    return text
+
+
 def estimate_base_class_from_refrock(refrock: object | None) -> tuple[int, list[str]]:
     risk_reasons: list[str] = []
-    text = str(refrock or "")
+    text = normalize_refrock_text(refrock)
     for token, class_num in ROCK_BASE_CLASS.items():
         if token in text:
             return class_num, risk_reasons

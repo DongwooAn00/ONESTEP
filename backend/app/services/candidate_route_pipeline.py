@@ -17,6 +17,11 @@ from app.services.cost_grid import (
     lon_lat_to_dem,
 )
 from app.services.cost_model import calculate_route_costs, evaluate_candidate_against_baseline
+from app.services.geology_service import (
+    GeologyDatasets,
+    enrich_candidate_tunnel_cells,
+    load_default_geology_datasets,
+)
 from app.services.land_compensation import (
     LAND_COMPENSATION_EXPLANATION,
     NullParcelRepository,
@@ -28,6 +33,7 @@ from app.services.region_filter import RegionContext, build_region_context
 from app.services.road_graph_routing import build_road_graph_route
 from app.services.road_network import snap_geometry_to_road_centerline
 from app.services.route_economics import rank_candidate_routes
+from app.services.route_cost import DEM_PROJ4
 from app.services.route_segments import RouteSegmentDetail, classify_route_segments
 
 
@@ -136,6 +142,8 @@ def _base_row(
         "surface_road_length_km": 0.0,
         "tunnel_length_km": 0.0,
         "tunnel_segment_count": 0,
+        "bridge_length_km": 0.0,
+        "bridge_count": 0,
         "status": status,
         "failed_reason": failed_reason,
         "total_grid_cost": 0.0,
@@ -246,7 +254,7 @@ def _project_new_build_geometry(row: dict):
 
     lines = []
     for segment in row.get("segment_details", []):
-        if segment.get("segment_type") not in {"connector", "new_surface_road"}:
+        if segment.get("segment_type") not in {"connector", "new_surface_road", "bridge"}:
             continue
         geometry = segment.get("segment_geometry", [])
         if len(geometry) < 2:
@@ -265,7 +273,7 @@ def _new_build_geometry(row: dict) -> list[dict[str, float]]:
     eligible = [
         segment
         for segment in row.get("segment_details", [])
-        if segment.get("segment_type") in {"connector", "new_surface_road"}
+        if segment.get("segment_type") in {"connector", "new_surface_road", "bridge"}
     ]
     coordinates: list[dict[str, float]] = []
     for segment in eligible:
@@ -319,6 +327,7 @@ def _apply_land_compensation(
             row["tunnel_length_km"],
             connector_length_km=row["connector_length_km"],
             land_compensation_cost_eok=land_cost_eok,
+            segment_details=row.get("segment_details"),
         )
     )
     row["land_compensation"] = compensation
@@ -394,6 +403,7 @@ def _dem_link(
     region_context: RegionContext | None,
     buffer_multiplier: float,
 ) -> dict:
+    active_dem_provider = dem_provider or PostgisDemProvider()
     grid, projected_start, projected_end = generate_dem_route_grid(
         start["lat"],
         start["lon"],
@@ -401,7 +411,7 @@ def _dem_link(
         end["lon"],
         candidate_id=route_id,
         buffer_multiplier=buffer_multiplier,
-        dem_provider=dem_provider,
+        dem_provider=active_dem_provider,
         apply_optional_layers=apply_optional_layers,
         region_context=region_context,
     )
@@ -416,13 +426,30 @@ def _dem_link(
             end["lon"],
             candidate_id=route_id,
             buffer_multiplier=buffer_multiplier * 2.0,
-            dem_provider=dem_provider,
+            dem_provider=active_dem_provider,
             apply_optional_layers=apply_optional_layers,
             region_context=region_context,
         )
         path = find_least_cost_path(grid, projected_start, projected_end)
         a_star_calls = 2
 
+    geology_datasets = (
+        load_default_geology_datasets()
+        if apply_optional_layers
+        else GeologyDatasets(None, None, None)
+    )
+    geology_warnings = enrich_candidate_tunnel_cells(
+        path.cells,
+        dem_provider=active_dem_provider,
+        datasets=geology_datasets,
+        source_crs=DEM_PROJ4,
+    )
+    if geology_datasets.litho_gdf is not None:
+        grid.warnings = [
+            warning
+            for warning in grid.warnings
+            if not warning.startswith("수치지질도 레이어가 없어")
+        ]
     route_length_km = _route_length_km_from_cells(path.cells)
     segment_summary = classify_route_segments(route_id, path.cells)
     details = _segment_rows(route_id, segment_summary["segment_details"])
@@ -450,8 +477,16 @@ def _dem_link(
         ),
         3,
     )
+    bridge_length_km = round(
+        sum(
+            detail["segment_length_km"]
+            for detail in details
+            if detail["segment_type"] == "bridge"
+        ),
+        3,
+    )
     route_length_km = round(
-        existing_road_length_km + new_surface_road_length_km + tunnel_length_km,
+        existing_road_length_km + new_surface_road_length_km + tunnel_length_km + bridge_length_km,
         3,
     )
     crossing_review_required = bool(segment_summary["crossing_review_required"])
@@ -460,7 +495,7 @@ def _dem_link(
         "경사·고저차·지형 위험·하천 회피 패널티를 반영했습니다.",
     ]
     if crossing_review_required:
-        explanation.append("하천·계곡 위험이 감지되었습니다. MVP에서는 교량 미반영, 추가 검토 필요.")
+        explanation.append("하천 교차 구간을 교량으로 우선 분류했습니다. 교량 공사비는 상세 검토가 필요합니다.")
 
     row = _base_row(edge, route_id, route_type)
     row.update(
@@ -472,6 +507,8 @@ def _dem_link(
             "surface_road_length_km": new_surface_road_length_km,
             "tunnel_length_km": tunnel_length_km,
             "tunnel_segment_count": segment_summary["tunnel_segment_count"],
+            "bridge_length_km": bridge_length_km,
+            "bridge_count": segment_summary["bridge_count"],
             "total_grid_cost": path.total_grid_cost,
             "average_slope": round(
                 sum(cell.slope_degrees for cell in path.cells) / len(path.cells),
@@ -482,7 +519,7 @@ def _dem_link(
             "max_slope": round(max((cell.slope_degrees for cell in path.cells), default=0.0), 2),
             "segment_details": details,
             "route_generation_method": "dem_grid_a_star",
-            "warnings": grid.warnings,
+            "warnings": list(dict.fromkeys(grid.warnings + geology_warnings)),
             "explanation": explanation,
             "crossing_review_required": crossing_review_required,
             "cost_grid_cell_count": grid.width * grid.height,
@@ -491,8 +528,9 @@ def _dem_link(
     )
     row.update(
         calculate_route_costs(
-            row["new_surface_road_length_km"],
+            row["new_surface_road_length_km"] + row["bridge_length_km"],
             row["tunnel_length_km"],
+            segment_details=row["segment_details"],
         )
     )
     return row
@@ -666,12 +704,16 @@ def _hybrid_candidate(
         sum(item["segment_length_km"] for item in segments if item["segment_type"] == "tunnel"),
         3,
     )
+    bridge_length = round(
+        sum(item["segment_length_km"] for item in segments if item["segment_type"] == "bridge"),
+        3,
+    )
 
     shortcut.update(
         {
             "route_geometry": combined_geometry,
             "route_length_km": round(
-                existing_length + connector_length + new_road_length + tunnel_length,
+                existing_length + connector_length + new_road_length + tunnel_length + bridge_length,
                 3,
             ),
             "existing_road_length_km": existing_length,
@@ -682,6 +724,8 @@ def _hybrid_candidate(
             "tunnel_segment_count": sum(
                 1 for item in segments if item["segment_type"] == "tunnel"
             ),
+            "bridge_length_km": bridge_length,
+            "bridge_count": sum(1 for item in segments if item["segment_type"] == "bridge"),
             "segment_details": segments,
             "route_generation_method": "road_baseline_plus_dem_shortcut",
             "explanation": [
@@ -689,7 +733,7 @@ def _hybrid_candidate(
                 "기존 도로는 접속·보조 구간으로만 유지하고 신규 링크의 효과를 baseline과 비교합니다.",
             ]
             + (
-                ["하천·계곡 위험이 감지되었습니다. MVP에서는 교량 미반영, 추가 검토 필요."]
+                ["하천 교차 구간을 교량으로 우선 분류했습니다. 교량 공사비는 상세 검토가 필요합니다."]
                 if shortcut.get("crossing_review_required")
                 else []
             ),
@@ -697,9 +741,10 @@ def _hybrid_candidate(
     )
     shortcut.update(
         calculate_route_costs(
-            new_road_length,
+            new_road_length + bridge_length,
             tunnel_length,
             connector_length_km=connector_length,
+            segment_details=segments,
         )
     )
     return shortcut
@@ -717,6 +762,9 @@ def evaluate_candidate_edge_candidates(
     prefix = f"R{edge.rank:03d}"
     candidates: list[dict] = []
     baseline: dict | None = None
+    if apply_optional_layers:
+        # Warm the cached GeoPandas datasets before parallel route searches.
+        load_default_geology_datasets()
 
     if apply_optional_layers:
         try:
@@ -888,6 +936,9 @@ def _public_route(row: dict) -> dict:
         "new_surface_road_length_km": row.get("new_surface_road_length_km", 0.0),
         "tunnel_length": row.get("tunnel_length_km", 0.0),
         "tunnel_length_km": row.get("tunnel_length_km", 0.0),
+        "bridge_length": row.get("bridge_length_km", 0.0),
+        "bridge_length_km": row.get("bridge_length_km", 0.0),
+        "bridge_count": row.get("bridge_count", 0),
         "estimated_flow": row.get("estimated_flow", 0.0),
         "saving_score": row.get("saving_score", 0.0),
         "diversion_rate": row.get("diversion_rate", 0.0),
@@ -951,6 +1002,7 @@ def _public_cost(row: dict) -> dict:
         "new_surface_road_length_km": row.get("new_surface_road_length_km", 0.0),
         "surface_road_length_km": row.get("new_surface_road_length_km", 0.0),
         "tunnel_length_km": row.get("tunnel_length_km", 0.0),
+        "bridge_length_km": row.get("bridge_length_km", 0.0),
         "surface_road_cost": row.get("surface_road_cost", 0.0),
         "new_road_cost": row.get("new_road_cost", 0.0),
         "connector_cost": row.get("connector_cost", 0.0),

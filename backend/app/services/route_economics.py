@@ -42,7 +42,7 @@ def _tunnel_risk_summary(row: dict) -> dict:
     tunnel_segments = [
         segment for segment in segments if segment.get("final_segment_type") == "tunnel" or segment.get("segment_type") == "tunnel"
     ]
-    tunnel_length_by_rock_class = {"II": 0.0, "III": 0.0, "IV": 0.0, "V": 0.0, "unknown": 0.0}
+    tunnel_length_by_rock_class = {"I": 0.0, "II": 0.0, "III": 0.0, "IV": 0.0, "V": 0.0, "unknown": 0.0}
     high_risk_tunnel_length_m = 0.0
     low_overburden_tunnel_length_m = 0.0
     very_poor_rock_tunnel_length_m = 0.0
@@ -69,6 +69,7 @@ def _tunnel_risk_summary(row: dict) -> dict:
     return {
         "total_tunnel_length_m": round(float(row.get("tunnel_length_km", 0.0)) * 1000.0, 1),
         "tunnel_count": int(row.get("tunnel_segment_count", len(tunnel_segments))),
+        "bridge_count": int(row.get("bridge_count", 0)),
         "surface_road_length_m": round(float(row.get("new_surface_road_length_km", 0.0)) * 1000.0, 1),
         "tunnel_length_by_rock_class": {
             key: round(value, 1) for key, value in tunnel_length_by_rock_class.items()

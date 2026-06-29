@@ -124,6 +124,37 @@ def test_cost_model_outputs_eok_units():
     assert costs["total_screen_cost"] > costs["total_direct_cost"]
 
 
+def test_cost_model_uses_each_tunnel_segments_estimated_rock_class():
+    common = {
+        "new_surface_road_length_km": 0.0,
+        "tunnel_length_km": 1.0,
+    }
+    good = calculate_route_costs(
+        **common,
+        segment_details=[
+            {
+                "segment_type": "tunnel",
+                "segment_length_km": 1.0,
+                "estimated_rock_class": "II",
+            }
+        ],
+    )
+    poor = calculate_route_costs(
+        **common,
+        segment_details=[
+            {
+                "segment_type": "tunnel",
+                "segment_length_km": 1.0,
+                "estimated_rock_class": "V",
+            }
+        ],
+    )
+
+    assert good["cost_assumptions"]["f_ground"] == 0.9
+    assert poor["cost_assumptions"]["f_ground"] == 2.5
+    assert poor["tunnel_cost"] > good["tunnel_cost"] * 2
+
+
 def test_land_compensation_is_added_after_route_generation(monkeypatch):
     class DummyParcelRepository:
         pass
@@ -196,6 +227,7 @@ def test_ranked_candidate_routes_sort_by_economic_score():
             "surface_road_length_km": 10,
             "new_surface_road_length_km": 10,
             "tunnel_length_km": 0,
+            "bridge_count": 1,
             "status": "success",
             "failed_reason": None,
         },
@@ -218,6 +250,7 @@ def test_ranked_candidate_routes_sort_by_economic_score():
     ranked = rank_candidate_routes(rows)
 
     assert ranked[0]["economic_score"] >= ranked[1]["economic_score"]
+    assert ranked[0]["bridge_count"] == 1
     assert ranked == sorted(ranked, key=lambda route: route["economic_score"], reverse=True)
 
 
@@ -234,11 +267,11 @@ def test_result_contract_contains_candidates_and_best_candidate():
     assert result["candidates"] == result["routes"]
     assert result["best_candidate"]["route_type"] == "new_direct"
     assert result["route"] == result["best_candidate"]
-    assert "bridge_length_km" not in result["costs"][0]
+    assert result["costs"][0]["bridge_length_km"] == 0
     assert "bridge_cost" not in result["costs"][0]
     assert {
         segment["segment_type"] for segment in result["segments"]
-    } <= {"existing_road", "connector", "new_surface_road", "tunnel"}
+    } <= {"existing_road", "connector", "new_surface_road", "tunnel", "bridge"}
 
 
 def test_existing_baseline_does_not_prevent_new_and_hybrid_candidates(monkeypatch):

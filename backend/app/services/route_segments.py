@@ -7,9 +7,13 @@ from app.services import route_mvp_config as config
 from app.services.cost_grid import CostCell
 from app.services.geotechnical_model import (
     TunnelDecisionInput,
+    classify_overburden_condition,
     estimate_surface_segment_cost_eok,
     estimate_tunnel_segment_cost_eok,
     evaluate_tunnel_decision,
+    get_rock_constructability,
+    get_rock_class_factor,
+    normalize_rock_class,
 )
 
 
@@ -128,7 +132,7 @@ def _atom_with_decision(cells: list[CostCell], index: int, start: CostCell, end:
         _avg_optional([start.local_relief_m, end.local_relief_m]) or 0.0,
     )
     road_grade = _road_grade_percent(start, end, length_km)
-    if original_type == "existing_road":
+    if original_type == "existing_road" and not river_rank:
         return _AtomicSegment(
             segment_type="existing_road",
             start=start,
@@ -162,11 +166,13 @@ def _atom_with_decision(cells: list[CostCell], index: int, start: CostCell, end:
             rock_class=rock_class,
             local_relief_m=local_relief,
             slope_deg=max_slope,
-            # Bridges are outside this MVP. Water crossings remain a grid
-            # penalty/risk note and never become a bridge segment.
-            river_crossing=False,
+            river_crossing=(
+                start.river_crossing
+                or end.river_crossing
+                or bool(river_rank)
+            ),
             protected_area=start.protected or end.protected,
-            urban_area=start.builtup_area or end.builtup_area,
+            urban_area=start.urban_area or end.urban_area or start.builtup_area or end.builtup_area,
             original_segment_type=original_type,
             segment_length_km=length_km,
             estimated_surface_cost_eok=surface_cost,
@@ -174,18 +180,15 @@ def _atom_with_decision(cells: list[CostCell], index: int, start: CostCell, end:
         )
     )
     risk_reasons = list(decision.risk_reasons)
-    if river_rank:
-        risk_reasons.append("MVP에서는 교량 미반영, 추가 검토 필요")
     for cell in (start, end):
         if cell.risk_reasons:
             risk_reasons.extend(cell.risk_reasons)
-    tunnel_is_justified = (
-        original_type == "tunnel"
-        and (road_grade or 0.0) >= config.MIN_TUNNEL_ROAD_GRADE_PERCENT
-        and tunnel_cost <= surface_cost * config.TUNNEL_COST_REASONABLE_RATIO
-    )
+    final_segment_type = {
+        "bridge": "bridge",
+        "tunnel": "tunnel",
+    }.get(decision.final_segment_type, "new_surface_road")
     return _AtomicSegment(
-        segment_type="tunnel" if decision.final_segment_type == "tunnel" and tunnel_is_justified else "new_surface_road",
+        segment_type=final_segment_type,
         start=start,
         end=end,
         length_km=length_km,
@@ -209,11 +212,7 @@ def _atom_with_decision(cells: list[CostCell], index: int, start: CostCell, end:
         boundary_dist_m=boundary_dist,
         estimated_surface_cost_eok=decision.estimated_surface_cost_eok,
         estimated_tunnel_cost_eok=decision.estimated_tunnel_cost_eok,
-        decision_reason=(
-            decision.decision_reason
-            if decision.final_segment_type != "tunnel" or tunnel_is_justified
-            else "surface_preferred_tunnel_conditions_not_jointly_satisfied"
-        ),
+        decision_reason=decision.decision_reason,
         risk_reasons=tuple(dict.fromkeys(risk_reasons)),
     )
 
@@ -247,7 +246,12 @@ def _downgrade_short_tunnels(atoms: list[_AtomicSegment]) -> list[_AtomicSegment
         if length_km < config.MIN_TUNNEL_CONTINUOUS_LENGTH_KM:
             for cursor in range(index, end):
                 atom = result[cursor]
-                result[cursor] = replace(atom, segment_type="new_surface_road")
+                result[cursor] = replace(
+                    atom,
+                    segment_type="new_surface_road",
+                    decision_status="surface_preferred",
+                    decision_reason="short_tunnel_below_minimum_length_surface_preferred",
+                )
         index = end
     return result
 
@@ -262,7 +266,7 @@ def _merge_tunnel_gaps(atoms: list[_AtomicSegment]) -> list[_AtomicSegment]:
         gap_start = index
         gap_length_km = 0.0
         while index < len(result) and result[index].segment_type != "tunnel":
-            if result[index].segment_type == "existing_road":
+            if result[index].segment_type in {"existing_road", "bridge"}:
                 gap_length_km = float("inf")
             gap_length_km += result[index].length_km
             index += 1
@@ -271,7 +275,12 @@ def _merge_tunnel_gaps(atoms: list[_AtomicSegment]) -> list[_AtomicSegment]:
         if has_tunnel_before and has_tunnel_after and gap_length_km < 0.2:
             for cursor in range(gap_start, index):
                 atom = result[cursor]
-                result[cursor] = replace(atom, segment_type="tunnel")
+                result[cursor] = replace(
+                    atom,
+                    segment_type="tunnel",
+                    decision_status="tunnel_candidate",
+                    decision_reason="short_surface_gap_merged_into_tunnel",
+                )
     return result
 
 
@@ -305,6 +314,39 @@ def _first_present(group: list[_AtomicSegment], attr: str):
     return None
 
 
+def _worst_rock_class(group: list[_AtomicSegment], attr: str) -> str | None:
+    values = [
+        normalize_rock_class(getattr(atom, attr))
+        for atom in group
+        if getattr(atom, attr) is not None
+    ]
+    if not values:
+        return None
+    return max(values, key=get_rock_class_factor)
+
+
+def _aggregate_overburden(group: list[_AtomicSegment]) -> float | None:
+    values = [atom.overburden_m for atom in group if atom.overburden_m is not None]
+    if not values:
+        return None
+    if any(value < 0 for value in values):
+        return min(values)
+    return _weighted_optional(group, "overburden_m")
+
+
+def _group_decision_reason(group: list[_AtomicSegment]) -> str | None:
+    reasons = [atom.decision_reason for atom in group if atom.decision_reason]
+    for priority in (
+        "bridge_due_to_river_crossing",
+        "negative_overburden_check_dem_or_profile",
+        "low_overburden_cut_and_cover_or_surface_preferred",
+        "avoid_or_reroute_due_to_very_poor_rock",
+    ):
+        if priority in reasons:
+            return priority
+    return reasons[0] if reasons else None
+
+
 def _sum_optional(group: list[_AtomicSegment], attr: str) -> float | None:
     values = [getattr(atom, attr) for atom in group if getattr(atom, attr) is not None]
     return round(sum(values), 3) if values else None
@@ -325,6 +367,8 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
             "new_surface_road_length_km": 0.0,
             "tunnel_length_km": 0.0,
             "tunnel_segment_count": 0,
+            "bridge_length_km": 0.0,
+            "bridge_count": 0,
             "segment_details": [],
             "crossing_review_required": False,
         }
@@ -339,6 +383,9 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
     details: list[RouteSegmentDetail] = []
     for index, group in enumerate(grouped, start=1):
         segment_type = group[0].segment_type
+        estimated_rock_class = _worst_rock_class(group, "estimated_rock_class")
+        rock_class = _worst_rock_class(group, "rock_class") or estimated_rock_class
+        overburden_m = _aggregate_overburden(group)
         raw_length_km = sum(atom.length_km for atom in group)
         length_km = raw_length_km
         weighted_slope = (
@@ -361,16 +408,20 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
                 tunnel_score=round(_weighted_optional(group, "tunnel_score"), 2)
                 if _weighted_optional(group, "tunnel_score") is not None
                 else None,
-                overburden_m=round(_weighted_optional(group, "overburden_m"), 2)
-                if _weighted_optional(group, "overburden_m") is not None
+                overburden_m=round(overburden_m, 2)
+                if overburden_m is not None
                 else None,
-                overburden_condition=_first_present(group, "overburden_condition"),
-                estimated_rock_class=_first_present(group, "estimated_rock_class"),
-                rock_class=_first_present(group, "rock_class"),
+                overburden_condition=classify_overburden_condition(overburden_m),
+                estimated_rock_class=estimated_rock_class,
+                rock_class=rock_class,
                 rock_ground_factor=round(_max_attr(group, "rock_ground_factor"), 2)
                 if _max_attr(group, "rock_ground_factor") is not None
                 else None,
-                rock_constructability=_first_present(group, "rock_constructability"),
+                rock_constructability=(
+                    get_rock_constructability(rock_class)
+                    if rock_class is not None
+                    else None
+                ),
                 road_grade_percent=round(_weighted_optional(group, "road_grade_percent"), 2)
                 if _weighted_optional(group, "road_grade_percent") is not None
                 else None,
@@ -388,7 +439,7 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
                 else None,
                 estimated_surface_cost_eok=_sum_optional(group, "estimated_surface_cost_eok"),
                 estimated_tunnel_cost_eok=_sum_optional(group, "estimated_tunnel_cost_eok"),
-                decision_reason=_first_present(group, "decision_reason"),
+                decision_reason=_group_decision_reason(group),
                 risk_reasons=_risk_reasons(group),
             )
         )
@@ -404,10 +455,8 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
         ),
         "tunnel_length_km": round(sum(item.segment_length_km for item in details if item.segment_type == "tunnel"), 3),
         "tunnel_segment_count": sum(1 for item in details if item.segment_type == "tunnel"),
+        "bridge_length_km": round(sum(item.segment_length_km for item in details if item.segment_type == "bridge"), 3),
+        "bridge_count": sum(1 for item in details if item.segment_type == "bridge"),
         "segment_details": details,
-        "crossing_review_required": any(
-            "MVP에서는 교량 미반영" in reason
-            for item in details
-            for reason in (item.risk_reasons or [])
-        ),
+        "crossing_review_required": any(item.segment_type == "bridge" for item in details),
     }

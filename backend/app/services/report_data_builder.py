@@ -115,7 +115,7 @@ def build_route_report_data(
     ]
     if bridge_segments:
         logger.warning(
-            "Route report ignored %s unsupported bridge segments for %s.",
+            "Route report found %s bridge segments requiring detailed cost review for %s.",
             len(bridge_segments),
             route.get("route_id"),
         )
@@ -223,6 +223,7 @@ def build_route_report_data(
     ))
     crossing_review = bool(
         route.get("crossing_review_required")
+        or bridge_segments
         or any(
             "교량 미반영" in str(reason)
             for segment in supported_segments
@@ -231,7 +232,7 @@ def build_route_report_data(
     )
     if bridge_segments:
         warnings.append(
-            f"교량 segment {len(bridge_segments)}건은 MVP 보고서 계산에서 제외했습니다."
+            f"교량 segment {len(bridge_segments)}건은 도로 단가 기반 예비비용에 포함했으며 전용 교량비 검토가 필요합니다."
         )
 
     return RouteReportData(

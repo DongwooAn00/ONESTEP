@@ -7,7 +7,6 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-GEOLOGY_DIR = ROOT / "data" / "raw" / "geology_250k"
 GEOLOGY_SRID = 4326
 DBF_ENCODING = os.environ.get("GEOLOGY_DBF_ENCODING", "UTF-8")
 
@@ -17,6 +16,21 @@ LAYERS = [
     ("Geology_250K_Boudary.shp", "geology_boundaries"),
     ("Geology_250K_Frame.shp", "geology_frames"),
 ]
+
+
+def find_geology_dir() -> Path:
+    configured = os.environ.get("GEOLOGY_DATA_DIR")
+    if configured:
+        path = Path(configured).expanduser()
+        if (path / "Geology_250K_Litho.shp").exists():
+            return path
+    lithology_path = next(
+        (ROOT / "data" / "raw").rglob("Geology_250K_Litho.shp"),
+        None,
+    )
+    if lithology_path is None:
+        return ROOT / "data" / "raw" / "geology_250k"
+    return lithology_path.parent
 
 
 def wait_for_database() -> None:
@@ -118,22 +132,23 @@ def load_shapefile(shapefile_path: Path, table_name: str) -> None:
         raise subprocess.CalledProcessError(psql_returncode, "psql")
 
 
-def assert_shapefiles_exist() -> None:
-    missing_files = [GEOLOGY_DIR / filename for filename, _ in LAYERS if not (GEOLOGY_DIR / filename).exists()]
+def assert_shapefiles_exist(geology_dir: Path) -> None:
+    missing_files = [geology_dir / filename for filename, _ in LAYERS if not (geology_dir / filename).exists()]
     if missing_files:
         joined_files = ", ".join(str(path) for path in missing_files)
         raise FileNotFoundError(f"수치지질도 Shapefile이 없습니다: {joined_files}")
 
 
 def main() -> None:
-    assert_shapefiles_exist()
+    geology_dir = find_geology_dir()
+    assert_shapefiles_exist(geology_dir)
     wait_for_database()
     run_psql("CREATE EXTENSION IF NOT EXISTS postgis;")
 
     for filename, table_name in LAYERS:
         print(f"Loading {filename} -> {table_name}")
         run_psql(f"DROP TABLE IF EXISTS {table_name};")
-        load_shapefile(GEOLOGY_DIR / filename, table_name)
+        load_shapefile(geology_dir / filename, table_name)
         run_psql(f"ANALYZE {table_name};")
 
 

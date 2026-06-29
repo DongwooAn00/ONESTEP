@@ -76,6 +76,7 @@ def calculate_route_costs(
     design_speed_kph: int = 80,
     tunnel_lanes: int = 2,
     geology_data=None,
+    segment_details: list | None = None,
     assumptions: CostAssumptions | None = None,
 ) -> dict:
     """신규 일반도로·접속도로·터널 공사비를 억원 단위로 합산한다."""
@@ -95,14 +96,41 @@ def calculate_route_costs(
     connector_cost = connector_length_km * active.road_unit_cost_eok_per_km
     new_road_cost_adjusted = new_road_cost * f_urban * f_speed
     connector_cost_adjusted = connector_cost * f_urban * f_speed
-    tunnel_cost = (
-        tunnel_length_m
-        * _thousand_krw_per_m_to_eok_per_m(tunnel_unit)
-        * active.tunnel_area_factor
-        * f_ground
-        * f_length
-        * active.tunnel_aux_factor
-    )
+    tunnel_segments = []
+    for segment in segment_details or []:
+        value = segment if isinstance(segment, dict) else vars(segment)
+        if value.get("segment_type") == "tunnel" or value.get("final_segment_type") == "tunnel":
+            tunnel_segments.append(value)
+
+    if tunnel_segments:
+        tunnel_cost = 0.0
+        ground_factor_length_sum = 0.0
+        segment_length_sum = 0.0
+        for segment in tunnel_segments:
+            segment_length_m = max(0.0, float(segment.get("segment_length_km") or 0.0) * 1000.0)
+            segment_ground_factor = getGroundFactorByGeology(None, segment)
+            tunnel_cost += (
+                segment_length_m
+                * _thousand_krw_per_m_to_eok_per_m(tunnel_unit)
+                * active.tunnel_area_factor
+                * segment_ground_factor
+                * _tunnel_length_factor(segment_length_m)
+                * active.tunnel_aux_factor
+            )
+            ground_factor_length_sum += segment_ground_factor * segment_length_m
+            segment_length_sum += segment_length_m
+        if segment_length_sum > 0:
+            f_ground = ground_factor_length_sum / segment_length_sum
+            f_length = None
+    else:
+        tunnel_cost = (
+            tunnel_length_m
+            * _thousand_krw_per_m_to_eok_per_m(tunnel_unit)
+            * active.tunnel_area_factor
+            * f_ground
+            * f_length
+            * active.tunnel_aux_factor
+        )
     new_road_screen_cost = new_road_cost_adjusted * (1 + active.road_contingency)
     connector_screen_cost = connector_cost_adjusted * (1 + active.road_contingency)
     tunnel_screen_cost = tunnel_cost * (1 + active.tunnel_contingency)
@@ -141,6 +169,7 @@ def calculate_route_costs(
             "f_speed": f_speed,
             "f_ground": f_ground,
             "f_length": f_length,
+            "ground_factor_source": "segment_rock_class" if tunnel_segments else "route_default",
             "f_aux": active.tunnel_aux_factor,
             "road_contingency": active.road_contingency,
             "tunnel_contingency": active.tunnel_contingency,
@@ -252,7 +281,8 @@ def evaluate_candidate_against_baseline(
     connector_length = float(candidate.get("connector_length_km", 0.0))
     new_road_length = float(candidate.get("new_surface_road_length_km", 0.0))
     tunnel_length = float(candidate.get("tunnel_length_km", 0.0))
-    new_length = connector_length + new_road_length + tunnel_length
+    bridge_length = float(candidate.get("bridge_length_km", 0.0))
+    new_length = connector_length + new_road_length + tunnel_length + bridge_length
     new_segment_ratio = new_length / candidate_length if candidate_length > 0 else 0.0
     existing_road_ratio = existing_length / candidate_length if candidate_length > 0 else 0.0
     tunnel_ratio = tunnel_length / new_length if new_length > 0 else 0.0

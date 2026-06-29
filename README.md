@@ -3,6 +3,9 @@
 See `docs/geotechnical-tunnel-decision.md` for the MVP tunnel decision update:
 overburden, estimated_rock_class, road grade, and cost comparison are now used
 when available, while the previous slope/local-relief fallback remains active.
+The candidate pipeline auto-detects the supplied 1:250K geology Shapefiles
+under `data/raw` (or `GEOLOGY_DATA_DIR`), samples potential tunnel runs at 20 m,
+and applies each tunnel segment's estimated rock-class factor to its cost.
 
 도로 터널 건설 사업의 경제성을 분석하는 웹 서비스입니다.
 

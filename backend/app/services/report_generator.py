@@ -109,10 +109,10 @@ class TemplateReportGenerator(BaseReportGenerator):
         if data.land_compensation_cost is None or data.land_compensation_cost == 0:
             limitations.append("토지 보상비는 필지·공시지가 데이터 보완 후 재검토가 필요합니다.")
         if data.crossing_review_required:
-            limitations.append("하천·계곡 통과 가능 구간은 MVP에서 교량을 반영하지 않아 추가 검토가 필요합니다.")
+            limitations.append("하천 교차 구간은 교량으로 예비 분류했으며 전용 형식·공사비 검토가 필요합니다.")
         if data.unsupported_bridge_count:
             limitations.append(
-                f"입력된 교량 segment {data.unsupported_bridge_count}건은 MVP 비용·연장 계산에서 제외했습니다."
+                f"교량 segment {data.unsupported_bridge_count}건은 도로 단가 기반 예비비용을 적용했습니다."
             )
         limitations.extend(data.warnings)
         limitations = list(dict.fromkeys(limitations))

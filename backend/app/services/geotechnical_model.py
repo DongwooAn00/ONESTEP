@@ -212,7 +212,21 @@ def _fallback_slope_decision(payload: TunnelDecisionInput, risk_reasons: list[st
 def evaluate_tunnel_decision(payload: TunnelDecisionInput) -> TunnelDecision:
     risk_reasons: list[str] = []
     if payload.river_crossing:
-        risk_reasons.append("MVP에서는 교량 미반영, 추가 검토 필요")
+        return TunnelDecision(
+            final_segment_type="bridge",
+            decision_status="bridge_required",
+            feasibility_flag=None,
+            tunnel_score=None,
+            overburden_condition=classify_overburden_condition(payload.overburden_m),
+            estimated_rock_class=normalize_rock_class(payload.estimated_rock_class),
+            rock_class=normalize_rock_class(payload.rock_class or payload.estimated_rock_class),
+            rock_ground_factor=get_rock_class_factor(payload.rock_class or payload.estimated_rock_class),
+            rock_constructability=get_rock_constructability(payload.rock_class or payload.estimated_rock_class),
+            estimated_surface_cost_eok=payload.estimated_surface_cost_eok,
+            estimated_tunnel_cost_eok=payload.estimated_tunnel_cost_eok,
+            decision_reason="bridge_due_to_river_crossing",
+            risk_reasons=["bridge_cost_requires_detailed_review"],
+        )
 
     has_overburden = payload.overburden_m is not None
     has_rock = payload.estimated_rock_class is not None or payload.rock_class is not None
@@ -263,7 +277,11 @@ def evaluate_tunnel_decision(payload: TunnelDecisionInput) -> TunnelDecision:
     feasibility_flag = "avoid_or_reroute" if payload.protected_area or normalized_rock == "V" else None
     decision_reason = "surface_preferred"
 
-    if payload.overburden_m is not None and payload.overburden_m < 20.0:
+    if payload.overburden_m is not None and payload.overburden_m < 0.0:
+        decision_reason = "negative_overburden_check_dem_or_profile"
+        final_type = "surface_road"
+        decision_status = "surface_preferred"
+    elif payload.overburden_m is not None and payload.overburden_m < 20.0:
         decision_reason = "low_overburden_cut_and_cover_or_surface_preferred"
         final_type = "surface_road"
         decision_status = "low_cover_tunnel_candidate" if tunnel_score >= 30 else "surface_preferred"
