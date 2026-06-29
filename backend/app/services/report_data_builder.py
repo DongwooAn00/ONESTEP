@@ -60,12 +60,22 @@ class RouteReportData:
     construction_cost: float | None
     total_project_cost: float | None
     annual_benefit: float | None
+    annual_time_benefit: float | None
+    annual_distance_benefit: float | None
+    annual_benefit_before_diversion: float | None
     total_benefit: float | None
+    total_benefit_before_diversion: float | None
     benefit_cost_ratio: float | None
     net_present_value: float | None
     economic_score: float | None
     distance_saving_km: float | None
+    distance_saving_ratio: float | None
+    time_saving_hours: float | None
     time_saving_minutes: float | None
+    time_saving_ratio: float | None
+    estimated_flow: float | None
+    diversion_rate: float | None
+    diverted_flow: float | None
     average_slope: float | None
     max_slope: float | None
     has_tunnel: bool
@@ -243,12 +253,22 @@ def build_route_report_data(
         construction_cost=_rounded(construction_cost),
         total_project_cost=_rounded(total_project_cost),
         annual_benefit=_rounded(_number(route.get("annual_benefit"), ranked.get("annual_benefit"))),
+        annual_time_benefit=_rounded(_number(route.get("annual_time_benefit"), ranked.get("annual_time_benefit"))),
+        annual_distance_benefit=_rounded(_number(route.get("annual_distance_benefit"), ranked.get("annual_distance_benefit"))),
+        annual_benefit_before_diversion=_rounded(_number(route.get("annual_benefit_before_diversion"), ranked.get("annual_benefit_before_diversion"))),
         total_benefit=_rounded(_number(route.get("total_benefit"), ranked.get("total_benefit"))),
+        total_benefit_before_diversion=_rounded(_number(route.get("total_benefit_before_diversion"), ranked.get("total_benefit_before_diversion"))),
         benefit_cost_ratio=_rounded(_number(route.get("benefit_cost_ratio"), ranked.get("benefit_cost_ratio"))),
         net_present_value=_rounded(_number(route.get("net_benefit"), ranked.get("net_benefit"))),
         economic_score=_rounded(_number(route.get("candidate_score"), ranked.get("candidate_score"), ranked.get("economic_score")), 2),
         distance_saving_km=_rounded(_number(route.get("distance_saving_km"), ranked.get("distance_saving_km"))),
+        distance_saving_ratio=_rounded(_number(route.get("distance_saving_ratio"), ranked.get("distance_saving_ratio")), 4),
+        time_saving_hours=_rounded(_number(route.get("time_saving_hours"), ranked.get("time_saving_hours")), 4),
         time_saving_minutes=_rounded(_number(route.get("time_saving_minutes"), ranked.get("time_saving_minutes")), 2),
+        time_saving_ratio=_rounded(_number(route.get("time_saving_ratio"), ranked.get("time_saving_ratio")), 4),
+        estimated_flow=_rounded(_number(route.get("estimated_flow"), ranked.get("estimated_flow"))),
+        diversion_rate=_rounded(_number(route.get("diversion_rate"), ranked.get("diversion_rate")), 4),
+        diverted_flow=_rounded(_number(route.get("diverted_flow"), ranked.get("diverted_flow"))),
         average_slope=_rounded(average_slope, 2),
         max_slope=_rounded(max_slope, 2),
         has_tunnel=(tunnel_length or 0.0) > 0,

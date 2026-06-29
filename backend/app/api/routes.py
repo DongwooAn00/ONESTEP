@@ -30,6 +30,7 @@ from app.services.vworld_land_price import (
     fetch_land_price_summary,
     fetch_land_price_summary_by_legal_dong,
 )
+from app.services.vworld_parcel_repository import get_default_parcel_repository
 
 router = APIRouter()
 
@@ -64,6 +65,7 @@ def create_candidate_routes(payload: CandidateRouteRequest) -> CandidateRouteRes
             selected_regions=payload.selected_regions,
             use_region_filter=payload.use_region_filter,
             region_buffer_km=payload.region_buffer_km,
+            parcel_repository=get_default_parcel_repository(),
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error

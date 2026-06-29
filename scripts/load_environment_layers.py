@@ -205,8 +205,17 @@ def _normalize_building_layers() -> None:
             source_id,
             NULLIF(name, '') AS name,
             area_type,
-            ST_Multi(ST_Transform(ST_SetSRID(ST_GeomFromText(source_wkt), {BUILDING_SOURCE_SRID}), {DEM_SRID}))
-                ::geometry(MultiPolygon, {DEM_SRID}) AS geom
+            ST_Multi(
+                ST_CollectionExtract(
+                    ST_MakeValid(
+                        ST_Transform(
+                            ST_SetSRID(ST_GeomFromText(source_wkt), {BUILDING_SOURCE_SRID}),
+                            {DEM_SRID}
+                        )
+                    ),
+                    3
+                )
+            )::geometry(MultiPolygon, {DEM_SRID}) AS geom
         FROM staging_buildings_raw
         WHERE source_wkt IS NOT NULL;
 

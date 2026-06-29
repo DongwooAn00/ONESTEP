@@ -70,6 +70,17 @@ class TemplateReportGenerator(BaseReportGenerator):
             f"순현재가치 또는 순편익은 {_value(data.net_present_value, '억원')}, 후보 점수는 "
             f"{_value(data.economic_score, '점', 1)}입니다."
         )
+        benefit_analysis += (
+            f" 전체 잠재 수요는 {_value(data.estimated_flow, '대/일')}, 신규 노선 전환률은 "
+            f"{_value(data.diversion_rate * 100.0 if data.diversion_rate is not None else None, '%')}, "
+            f"전환 이용 수요는 {_value(data.diverted_flow, '대/일')}로 산정했습니다. "
+            f"기존도로 대비 거리 절감률은 "
+            f"{_value(data.distance_saving_ratio * 100.0 if data.distance_saving_ratio is not None else None, '%')}, "
+            f"시간 절감률은 "
+            f"{_value(data.time_saving_ratio * 100.0 if data.time_saving_ratio is not None else None, '%')}입니다. "
+            f"전환률 미반영 연간 편익 {_value(data.annual_benefit_before_diversion, '억원/년')}과 비교하여, "
+            f"전환률 반영 후 연간 편익은 {_value(data.annual_benefit, '억원/년')}입니다."
+        )
         technical_review = (
             f"DEM 기반 1차 경사도 분석에서 평균 경사도는 {_value(data.average_slope, '°')}, "
             f"최대 경사도는 {_value(data.max_slope, '°')}로 집계되었습니다. {tunnel_text} "
@@ -138,12 +149,22 @@ class TemplateReportGenerator(BaseReportGenerator):
             construction_cost=data.construction_cost,
             total_project_cost=data.total_project_cost,
             annual_benefit=data.annual_benefit,
+            annual_time_benefit=data.annual_time_benefit,
+            annual_distance_benefit=data.annual_distance_benefit,
+            annual_benefit_before_diversion=data.annual_benefit_before_diversion,
             benefit=data.total_benefit,
+            benefit_before_diversion=data.total_benefit_before_diversion,
             benefit_cost_ratio=data.benefit_cost_ratio,
             net_present_value=data.net_present_value,
             economic_score=data.economic_score,
             distance_saving_km=data.distance_saving_km,
+            distance_saving_ratio=data.distance_saving_ratio,
+            time_saving_hours=data.time_saving_hours,
             time_saving_minutes=data.time_saving_minutes,
+            time_saving_ratio=data.time_saving_ratio,
+            estimated_flow=data.estimated_flow,
+            diversion_rate=data.diversion_rate,
+            diverted_flow=data.diverted_flow,
             average_slope=data.average_slope,
             max_slope=data.max_slope,
         )

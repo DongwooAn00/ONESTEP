@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import heapq
+import logging
 import math
 from dataclasses import dataclass
 
@@ -10,6 +11,8 @@ from app.services import route_mvp_config as config
 from app.services.cost_grid import dem_to_lon_lat, lon_lat_to_dem
 from app.services.region_filter import RegionContext
 from app.services.road_network import RoadAccessPoint, nearest_road_node, to_coordinate, to_road_point
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -52,6 +55,10 @@ class RoadGraphRoute:
     road_nodes_after: int = 0
     road_edges_before: int = 0
     road_edges_after: int = 0
+    origin_road_node_id: str | None = None
+    destination_road_node_id: str | None = None
+    origin_snap_distance_m: float = 0.0
+    destination_snap_distance_m: float = 0.0
 
 
 def _node_lookup(nodes: list[CandidateNode]) -> dict[str, CandidateNode]:
@@ -114,6 +121,23 @@ def _query_corridor_edges(
     max_x = max(start.road_x, end.road_x) + buffer_m
     min_y = min(start.road_y, end.road_y) - buffer_m
     max_y = max(start.road_y, end.road_y) + buffer_m
+    if region_context is not None and region_context.enabled and region_context.envelope is not None:
+        envelope = region_context.envelope
+        region_points = [
+            to_road_point(lat, lon)
+            for lon, lat in (
+                (envelope.min_lon, envelope.min_lat),
+                (envelope.min_lon, envelope.max_lat),
+                (envelope.max_lon, envelope.min_lat),
+                (envelope.max_lon, envelope.max_lat),
+            )
+        ]
+        min_x = max(min_x, min(point.x for point in region_points))
+        max_x = min(max_x, max(point.x for point in region_points))
+        min_y = max(min_y, min(point.y for point in region_points))
+        max_y = min(max_y, max(point.y for point in region_points))
+        if min_x >= max_x or min_y >= max_y:
+            raise ValueError("기존도로 검색 corridor가 선택 계산 구역과 겹치지 않습니다.")
 
     with connect() as connection:
         with connection.cursor() as cursor:
@@ -154,7 +178,11 @@ def _query_corridor_edges(
         for row in rows
         for node_id in (row[1], row[4])
     }
-    if region_context is not None and region_context.enabled:
+    if (
+        region_context is not None
+        and region_context.enabled
+        and len(region_context.bounds) > 1
+    ):
         filtered_rows = []
         for row in rows:
             start_coordinate = to_coordinate(float(row[2]), float(row[3]))
@@ -294,10 +322,16 @@ def _geometry_to_lat_lon(points: list[tuple[float, float]]) -> list[dict[str, fl
     return [{"lat": to_coordinate(x, y).lat, "lon": to_coordinate(x, y).lon} for x, y in points]
 
 
-def _access_geometry(node: CandidateNode, access: RoadAccessPoint) -> list[dict[str, float]]:
+def _access_geometry(
+    node: CandidateNode,
+    access: RoadAccessPoint,
+    *,
+    road_target: dict[str, float] | None = None,
+) -> list[dict[str, float]]:
     direct_geometry = [
         {"lat": node.latitude, "lon": node.longitude},
-        {"lat": access.coordinate.lat, "lon": access.coordinate.lon},
+        road_target
+        or {"lat": access.coordinate.lat, "lon": access.coordinate.lon},
     ]
     return _detour_access_geometry_around_buildings(direct_geometry)
 
@@ -477,26 +511,77 @@ def build_road_graph_route(
     nodes: list[CandidateNode],
     *,
     route_id: str,
-    buffer_multiplier: float = 1.2,
+    buffer_multiplier: float = 0.25,
     min_buffer_km: float = 8.0,
     region_context: RegionContext | None = None,
 ) -> RoadGraphRoute:
     from_node, to_node = _candidate_endpoints(edge, nodes)
     start_access = nearest_road_node(from_node.latitude, from_node.longitude)
     end_access = nearest_road_node(to_node.latitude, to_node.longitude)
-    graph_nodes, adjacency, graph_stats = _query_corridor_edges(
-        start_access,
-        end_access,
-        edge=edge,
-        buffer_multiplier=buffer_multiplier,
-        min_buffer_km=min_buffer_km,
-        region_context=region_context,
-    )
-    road_path = _find_road_path(graph_nodes, adjacency, start_access.node_id, end_access.node_id)
+    start_snap_distance_m = _access_distance_m(from_node, start_access)
+    end_snap_distance_m = _access_distance_m(to_node, end_access)
+    for candidate_node, access, distance_m in (
+        (from_node, start_access, start_snap_distance_m),
+        (to_node, end_access, end_snap_distance_m),
+    ):
+        logger.info(
+            "[RoadSnap] candidate_id=%s candidate_node=%s nearest_road_node=%s distance_m=%.1f",
+            route_id,
+            candidate_node.node_id,
+            access.node_id,
+            distance_m,
+        )
+    attempts = list(dict.fromkeys((buffer_multiplier, max(0.5, buffer_multiplier), 1.0)))
+    last_error: ValueError | None = None
+    for active_buffer in attempts:
+        graph_nodes, adjacency, graph_stats = _query_corridor_edges(
+            start_access,
+            end_access,
+            edge=edge,
+            buffer_multiplier=active_buffer,
+            min_buffer_km=min_buffer_km,
+            region_context=region_context,
+        )
+        try:
+            road_path = _find_road_path(
+                graph_nodes,
+                adjacency,
+                start_access.node_id,
+                end_access.node_id,
+            )
+            if active_buffer != attempts[0]:
+                logger.info(
+                    "[RoadGraph] candidate_id=%s corridor_retry_multiplier=%.2f",
+                    route_id,
+                    active_buffer,
+                )
+            break
+        except ValueError as error:
+            last_error = error
+    else:
+        raise last_error or ValueError("기존도로 경로를 찾지 못했습니다.")
 
     details: list[dict] = []
-    start_access_geometry = _access_geometry(from_node, start_access)
-    end_access_geometry = _access_geometry(to_node, end_access)
+    road_start_geometry = (
+        _geometry_to_lat_lon([road_path[0].geometry_xy[0]])
+        if road_path and road_path[0].geometry_xy
+        else []
+    )
+    road_end_geometry = (
+        _geometry_to_lat_lon([road_path[-1].geometry_xy[-1]])
+        if road_path and road_path[-1].geometry_xy
+        else []
+    )
+    start_access_geometry = _access_geometry(
+        from_node,
+        start_access,
+        road_target=road_start_geometry[0] if road_start_geometry else None,
+    )
+    end_access_geometry = _access_geometry(
+        to_node,
+        end_access,
+        road_target=road_end_geometry[0] if road_end_geometry else None,
+    )
     _append_segment(details, route_id, "connector", start_access_geometry)
     _merge_existing_road_segments(route_id, road_path, details)
     _append_segment(details, route_id, "connector", list(reversed(end_access_geometry)))
@@ -528,8 +613,20 @@ def build_road_graph_route(
     existing_access_percent = round(existing_access_length / route_length_km * 100.0, 1) if route_length_km else 0.0
 
     warnings = []
+    for candidate_node, access, distance_m in (
+        (from_node, start_access, start_snap_distance_m),
+        (to_node, end_access, end_snap_distance_m),
+    ):
+        if distance_m > config.MAX_ROAD_SNAP_DISTANCE_M:
+            warning = (
+                f"{route_id}: 후보 정점 {candidate_node.node_id}의 최근접 도로 노드 "
+                f"{access.node_id}까지 스냅 거리가 {distance_m / 1000.0:.2f} km로 "
+                f"허용거리 {config.MAX_ROAD_SNAP_DISTANCE_M / 1000.0:.2f} km를 초과합니다."
+            )
+            warnings.append(warning)
+            logger.warning("[RoadSnap] %s", warning)
     access_distance_m = _access_distance_m(from_node, start_access) + _access_distance_m(to_node, end_access)
-    if access_distance_m > config.MAX_TOTAL_ROAD_SNAP_DISTANCE_M:
+    if access_distance_m > config.MAX_ROAD_SNAP_DISTANCE_M * 2:
         warnings.append(
             f"{route_id}: 후보 정점과 기존 도로망 접속 거리 합계가 {access_distance_m / 1000.0:.2f} km입니다."
         )
@@ -545,5 +642,9 @@ def build_road_graph_route(
         existing_road_access_length_km=existing_access_length,
         existing_road_access_percent=existing_access_percent,
         warnings=warnings,
+        origin_road_node_id=start_access.node_id,
+        destination_road_node_id=end_access.node_id,
+        origin_snap_distance_m=round(start_snap_distance_m, 1),
+        destination_snap_distance_m=round(end_snap_distance_m, 1),
         **graph_stats,
     )

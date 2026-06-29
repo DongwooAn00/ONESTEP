@@ -32,6 +32,7 @@ class CostCell:
     cost: float = 1.0
     river_rank: str | None = None
     road_rank: str | None = None
+    road_distance_m: float | None = None
     protected: bool = False
     building: bool = False
     builtup_area: bool = False
@@ -144,21 +145,21 @@ def _transform_pyproj(transform, x: float, y: float) -> ProjectedPoint:
 
 def lon_lat_to_dem(lon: float, lat: float) -> ProjectedPoint:
     try:
-        return _transform(_spatial_refs()["wgs84_to_dem"], lon, lat)
+        return _transform_pyproj(_pyproj_transformers()["wgs84_to_dem"], lon, lat)
     except ImportError:
         try:
-            return _transform_pyproj(_pyproj_transformers()["wgs84_to_dem"], lon, lat)
+            return _transform(_spatial_refs()["wgs84_to_dem"], lon, lat)
         except ImportError:
             return _fallback_project(lon, lat)
 
 
 def dem_to_lon_lat(x: float, y: float) -> tuple[float, float]:
     try:
-        point = _transform(_spatial_refs()["dem_to_wgs84"], x, y)
+        point = _transform_pyproj(_pyproj_transformers()["dem_to_wgs84"], x, y)
         return point.x, point.y
     except ImportError:
         try:
-            point = _transform_pyproj(_pyproj_transformers()["dem_to_wgs84"], x, y)
+            point = _transform(_spatial_refs()["dem_to_wgs84"], x, y)
             return point.x, point.y
         except ImportError:
             return _fallback_unproject(x, y)
@@ -166,10 +167,10 @@ def dem_to_lon_lat(x: float, y: float) -> tuple[float, float]:
 
 def dem_to_road(x: float, y: float) -> ProjectedPoint:
     try:
-        return _transform(_spatial_refs()["dem_to_road"], x, y)
+        return _transform_pyproj(_pyproj_transformers()["dem_to_road"], x, y)
     except ImportError:
         try:
-            return _transform_pyproj(_pyproj_transformers()["dem_to_road"], x, y)
+            return _transform(_spatial_refs()["dem_to_road"], x, y)
         except ImportError:
             return ProjectedPoint(x, y)
 
@@ -188,27 +189,67 @@ def _fallback_unproject(x: float, y: float) -> tuple[float, float]:
 
 
 class PostgisDemProvider:
-    def resolution_m(self) -> float | None:
+    def __init__(self) -> None:
+        self._metadata: tuple[float, float, float, float] | None = None
+        self._elevation_cache: dict[tuple[int, int], float | None] = {}
+
+    def _grid_metadata(self) -> tuple[float, float, float, float] | None:
+        if self._metadata is not None:
+            return self._metadata
         try:
             with connect() as connection:
                 with connection.cursor() as cursor:
                     cursor.execute(
                         """
-                        SELECT ABS(ST_ScaleX(rast)), ABS(ST_ScaleY(rast))
+                        SELECT
+                            ABS(ST_ScaleX(rast)),
+                            ABS(ST_ScaleY(rast)),
+                            ST_UpperLeftX(rast),
+                            ST_UpperLeftY(rast)
                         FROM dem_elevation
                         LIMIT 1;
                         """
                     )
                     row = cursor.fetchone()
-            if row is None or row[0] is None or row[1] is None:
+            if row is None or any(value is None for value in row):
                 return None
-            return max(float(row[0]), float(row[1]))
+            self._metadata = tuple(float(value) for value in row)
+            return self._metadata
         except Exception:
             return None
+
+    def resolution_m(self) -> float | None:
+        metadata = self._grid_metadata()
+        return max(metadata[0], metadata[1]) if metadata is not None else None
 
     def elevations(self, points: list[ProjectedPoint]) -> list[float | None]:
         if not points:
             return []
+        metadata = self._grid_metadata()
+        if metadata is None:
+            keys = [(round(point.x), round(point.y)) for point in points]
+        else:
+            scale_x, scale_y, origin_x, origin_y = metadata
+            keys = [
+                (
+                    math.floor((point.x - origin_x) / scale_x),
+                    math.floor((origin_y - point.y) / scale_y),
+                )
+                for point in points
+            ]
+        missing_by_key: dict[tuple[int, int], ProjectedPoint] = {}
+        for key, point in zip(keys, points):
+            if key not in self._elevation_cache:
+                missing_by_key.setdefault(key, point)
+        if missing_by_key:
+            missing_keys = list(missing_by_key)
+            missing_points = [missing_by_key[key] for key in missing_keys]
+            fetched = self._fetch_elevations(missing_points)
+            self._elevation_cache.update(zip(missing_keys, fetched))
+        return [self._elevation_cache[key] for key in keys]
+
+    @staticmethod
+    def _fetch_elevations(points: list[ProjectedPoint]) -> list[float | None]:
         xs = [point.x for point in points]
         ys = [point.y for point in points]
         with connect() as connection:
@@ -260,6 +301,32 @@ def _find_existing_table(names: list[str]) -> str | None:
         if _table_exists(name):
             return name
     return None
+
+
+@lru_cache(maxsize=16)
+def _table_columns(table_name: str) -> frozenset[str]:
+    with connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = current_schema()
+                  AND table_name = %s;
+                """,
+                (table_name,),
+            )
+            return frozenset(str(row[0]) for row in cursor.fetchall())
+
+
+def _layer_text_expression(table_name: str) -> str:
+    available = _table_columns(table_name)
+    columns = [
+        f"{table_name}.{column}"
+        for column in ("area_type", "type", "name")
+        if column in available
+    ]
+    return f"COALESCE({', '.join(columns)}, '')" if columns else "''"
 
 
 def _normalize_river_rank(value: object) -> str:
@@ -340,27 +407,43 @@ def _apply_optional_rivers(grid: CostGrid) -> None:
         return
 
     try:
+        cells = [cell for row_cells in grid.cells for cell in row_cells]
         with connect() as connection:
             with connection.cursor() as cursor:
-                for row_cells in grid.cells:
-                    for cell in row_cells:
-                        cursor.execute(
-                            f"""
-                            WITH input_point AS (
-                                SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100002) AS geom
-                            )
-                            SELECT COALESCE(river_rank, rank, type, name, '') AS river_rank
-                            FROM {table}, input_point
-                            WHERE ST_DWithin({table}.geom, input_point.geom, %s)
-                            LIMIT 1;
-                            """,
-                            (cell.x, cell.y, grid.cell_size_m * 0.7),
-                        )
-                        result = cursor.fetchone()
-                        if result:
-                            rank = _normalize_river_rank(result[0])
-                            cell.river_rank = rank
-                            cell.cost *= config.RIVER_MULTIPLIERS.get(rank, 10.0)
+                cursor.execute(
+                    f"""
+                    WITH input_points AS (
+                        SELECT
+                            ordinality AS point_index,
+                            ST_SetSRID(ST_MakePoint(x, y), 100002) AS geom
+                        FROM unnest(
+                            %s::double precision[],
+                            %s::double precision[]
+                        ) WITH ORDINALITY AS points(x, y, ordinality)
+                    )
+                    SELECT input_points.point_index, nearest.river_rank
+                    FROM input_points
+                    LEFT JOIN LATERAL (
+                        SELECT COALESCE(river_rank, rank, type, name, '') AS river_rank
+                        FROM {table}
+                        WHERE ST_DWithin({table}.geom, input_points.geom, %s)
+                        ORDER BY {table}.geom <-> input_points.geom
+                        LIMIT 1
+                    ) AS nearest ON TRUE
+                    ORDER BY input_points.point_index;
+                    """,
+                    (
+                        [cell.x for cell in cells],
+                        [cell.y for cell in cells],
+                        grid.cell_size_m * 0.7,
+                    ),
+                )
+                results = cursor.fetchall()
+        for cell, result in zip(cells, results):
+            if result[1] is not None:
+                rank = _normalize_river_rank(result[1])
+                cell.river_rank = rank
+                cell.cost *= config.RIVER_MULTIPLIERS.get(rank, 10.0)
     except Exception as error:
         grid.warnings.append(f"하천 데이터 반영을 건너뜁니다: {error}")
 
@@ -371,29 +454,50 @@ def _apply_optional_roads(grid: CostGrid) -> None:
         return
 
     try:
+        cells = [cell for row_cells in grid.cells for cell in row_cells]
+        road_points = [dem_to_road(cell.x, cell.y) for cell in cells]
         with connect() as connection:
             with connection.cursor() as cursor:
-                for row_cells in grid.cells:
-                    for cell in row_cells:
-                        road_point = dem_to_road(cell.x, cell.y)
-                        cursor.execute(
-                            """
-                            WITH input_point AS (
-                                SELECT ST_SetSRID(ST_MakePoint(%s, %s), 100001) AS geom
-                            )
-                            SELECT road_rank
-                            FROM road_links, input_point
-                            WHERE ST_DWithin(road_links.geom, input_point.geom, %s)
-                            ORDER BY road_links.geom <-> input_point.geom
-                            LIMIT 1;
-                            """,
-                            (road_point.x, road_point.y, config.ROAD_ACCESS_BUFFER_M),
-                        )
-                        result = cursor.fetchone()
-                        if result:
-                            multiplier, rank = _road_multiplier(result[0])
-                            cell.cost *= multiplier
-                            cell.road_rank = rank
+                cursor.execute(
+                    """
+                    WITH input_points AS (
+                        SELECT
+                            ordinality AS point_index,
+                            ST_SetSRID(ST_MakePoint(x, y), 100001) AS geom
+                        FROM unnest(
+                            %s::double precision[],
+                            %s::double precision[]
+                        ) WITH ORDINALITY AS points(x, y, ordinality)
+                    )
+                    SELECT
+                        input_points.point_index,
+                        nearest.road_rank,
+                        nearest.distance_m
+                    FROM input_points
+                    LEFT JOIN LATERAL (
+                        SELECT
+                            road_links.road_rank,
+                            ST_Distance(road_links.geom, input_points.geom) AS distance_m
+                        FROM road_links
+                        WHERE ST_DWithin(road_links.geom, input_points.geom, %s)
+                        ORDER BY road_links.geom <-> input_points.geom
+                        LIMIT 1
+                    ) AS nearest ON TRUE
+                    ORDER BY input_points.point_index;
+                    """,
+                    (
+                        [point.x for point in road_points],
+                        [point.y for point in road_points],
+                        config.ROAD_ACCESS_BUFFER_M,
+                    ),
+                )
+                results = cursor.fetchall()
+        for cell, result in zip(cells, results):
+            if result[1] is not None:
+                multiplier, rank = _road_multiplier(result[1])
+                cell.cost *= multiplier
+                cell.road_rank = rank
+                cell.road_distance_m = float(result[2])
     except Exception as error:
         grid.warnings.append(f"기존 도로망 비용 보정을 건너뜁니다: {error}")
 
@@ -595,6 +699,147 @@ def _apply_optional_protected_areas(grid: CostGrid) -> None:
         grid.warnings.append(f"건물/시가지 비용 보정을 건너뜁니다: {error}")
 
 
+def _apply_optional_protected_areas_batched(grid: CostGrid) -> None:
+    """Apply polygon avoidance layers with a bounded number of SQL queries."""
+    protected_table = _find_existing_table(["protected_areas"])
+    building_table = _find_existing_table(["building_footprints"])
+    builtup_table = _find_existing_table(["builtup_areas", "urban_areas"])
+    if protected_table is None and building_table is None and builtup_table is None:
+        if not _apply_population_urban_penalty(grid):
+            grid.warnings.append("건물/시가지 레이어가 없어 시가지 회피 비용을 반영하지 못했습니다.")
+        return
+
+    cells = [cell for row_cells in grid.cells for cell in row_cells]
+    xs = [cell.x for cell in cells]
+    ys = [cell.y for cell in cells]
+    protected_types: list[str | None] = [None] * len(cells)
+    building_flags: list[tuple[bool, bool]] = [(False, False)] * len(cells)
+    builtup_types: list[str | None] = [None] * len(cells)
+    try:
+        protected_text = (
+            _layer_text_expression(protected_table)
+            if protected_table is not None
+            else "''"
+        )
+        builtup_text = (
+            _layer_text_expression(builtup_table)
+            if builtup_table is not None
+            else "''"
+        )
+        with connect() as connection:
+            with connection.cursor() as cursor:
+                if protected_table is not None:
+                    cursor.execute(
+                        f"""
+                        WITH input_points AS (
+                            SELECT ordinality AS point_index,
+                                   ST_SetSRID(ST_MakePoint(x, y), 100002) AS geom
+                            FROM unnest(%s::double precision[], %s::double precision[])
+                                 WITH ORDINALITY AS points(x, y, ordinality)
+                        )
+                        SELECT input_points.point_index, layer.area_type
+                        FROM input_points
+                        LEFT JOIN LATERAL (
+                            SELECT {protected_text} AS area_type
+                            FROM {protected_table}
+                            WHERE ST_Intersects({protected_table}.geom, input_points.geom)
+                            LIMIT 1
+                        ) AS layer ON TRUE
+                        ORDER BY input_points.point_index;
+                        """,
+                        (xs, ys),
+                    )
+                    protected_types = [
+                        str(row[1]).lower() if row[1] is not None else None
+                        for row in cursor.fetchall()
+                    ]
+
+                if building_table is not None:
+                    cursor.execute(
+                        f"""
+                        WITH input_points AS (
+                            SELECT ordinality AS point_index,
+                                   ST_SetSRID(ST_MakePoint(x, y), 100002) AS geom
+                            FROM unnest(%s::double precision[], %s::double precision[])
+                                 WITH ORDINALITY AS points(x, y, ordinality)
+                        )
+                        SELECT input_points.point_index,
+                               EXISTS (
+                                   SELECT 1 FROM {building_table}
+                                   WHERE ST_Intersects({building_table}.geom, input_points.geom)
+                               ) AS intersects_building,
+                               EXISTS (
+                                   SELECT 1 FROM {building_table}
+                                   WHERE ST_DWithin({building_table}.geom, input_points.geom, %s)
+                               ) AS near_building
+                        FROM input_points
+                        ORDER BY input_points.point_index;
+                        """,
+                        (xs, ys, config.BUILDING_BUFFER_M),
+                    )
+                    building_flags = [
+                        (bool(row[1]), bool(row[2])) for row in cursor.fetchall()
+                    ]
+
+                if builtup_table is not None:
+                    cursor.execute(
+                        f"""
+                        WITH input_points AS (
+                            SELECT ordinality AS point_index,
+                                   ST_SetSRID(ST_MakePoint(x, y), 100002) AS geom
+                            FROM unnest(%s::double precision[], %s::double precision[])
+                                 WITH ORDINALITY AS points(x, y, ordinality)
+                        )
+                        SELECT input_points.point_index, layer.area_type
+                        FROM input_points
+                        LEFT JOIN LATERAL (
+                            SELECT {builtup_text} AS area_type
+                            FROM {builtup_table}
+                            WHERE ST_Intersects({builtup_table}.geom, input_points.geom)
+                            LIMIT 1
+                        ) AS layer ON TRUE
+                        ORDER BY input_points.point_index;
+                        """,
+                        (xs, ys),
+                    )
+                    builtup_types = [
+                        str(row[1]).lower() if row[1] is not None else None
+                        for row in cursor.fetchall()
+                    ]
+    except Exception as error:
+        grid.warnings.append(f"건물/시가지 일괄 비용 보정을 건너뜁니다: {error}")
+        return
+
+    for cell, protected_type, building_flag, builtup_type in zip(
+        cells, protected_types, building_flags, builtup_types
+    ):
+        if protected_type and ("protect" in protected_type or "보호" in protected_type):
+            cell.cost = config.PROTECTED_AREA_BLOCK_COST
+            cell.protected = True
+            continue
+        intersects_building, near_building = building_flag
+        if intersects_building:
+            cell.cost = config.BUILDING_BLOCK_COST
+            cell.protected = True
+            cell.building = True
+            continue
+        if near_building:
+            cell.cost *= config.BUILDING_BUFFER_MULTIPLIER
+            cell.builtup_area = True
+            continue
+        if not builtup_type:
+            continue
+        if "protect" in builtup_type or "보호" in builtup_type:
+            cell.cost = config.PROTECTED_AREA_BLOCK_COST
+            cell.protected = True
+        elif "building" in builtup_type or "건물" in builtup_type:
+            cell.cost *= config.BUILTUP_AREA_MULTIPLIER
+            cell.builtup_area = True
+        else:
+            cell.cost *= config.URBAN_AREA_MULTIPLIER
+            cell.builtup_area = True
+
+
 def build_cost_grid(
     edge: CandidateEdge,
     nodes: list[CandidateNode],
@@ -634,7 +879,11 @@ def build_cost_grid(
                 raise ValueError(
                     "후보 연결쌍이 선택 행정구역의 경계 여유 범위 밖에 있습니다."
                 )
-    active_cell_size = _adaptive_cell_size(max_x - min_x, max_y - min_y, cell_size_m)
+    active_cell_size = _adaptive_cell_size(
+        max_x - min_x,
+        max_y - min_y,
+        cell_size_m,
+    )
     active_provider = dem_provider or PostgisDemProvider()
     dem_resolution_m = active_provider.resolution_m() if hasattr(active_provider, "resolution_m") else None
     if dem_resolution_m:
@@ -672,7 +921,7 @@ def build_cost_grid(
         _apply_optional_rivers(grid)
         if apply_existing_road_bias:
             _apply_optional_roads(grid)
-        _apply_optional_protected_areas(grid)
+        _apply_optional_protected_areas_batched(grid)
     return grid, start, end
 
 
@@ -692,8 +941,9 @@ def generate_dem_route_grid(
 ) -> tuple[CostGrid, ProjectedPoint, ProjectedPoint]:
     """Build an independent DEM grid for a new link between arbitrary points.
 
-    Existing roads deliberately do not receive a low-cost bias here. They are
-    used by baseline/hybrid assembly, not as a substitute for a new alignment.
+    Existing-road and road-buffer cells receive a lower traversal cost. This
+    lets the DEM route stay on the current network and leave it only where a
+    terrain-aware new link is worthwhile.
     """
     start_node = CandidateNode(
         node_id=f"{candidate_id}-START",
@@ -731,6 +981,6 @@ def generate_dem_route_grid(
         cell_size_m=cell_size_m,
         dem_provider=dem_provider,
         apply_optional_layers=apply_optional_layers,
-        apply_existing_road_bias=False,
+        apply_existing_road_bias=True,
         region_context=region_context,
     )

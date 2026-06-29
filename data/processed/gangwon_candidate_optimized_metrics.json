@@ -1,0 +1,31 @@
+{
+  "elapsed_seconds": 19.245,
+  "response_bytes": 691111,
+  "route_count": 7,
+  "ranked_count": 5,
+  "segment_count": 36,
+  "route_geometry_points": 1960,
+  "segment_geometry_points": 1998,
+  "warnings": [
+    "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다.",
+    "하천/수계 레이어가 없어 하천·계곡 회피 위험 패널티를 반영하지 못했습니다."
+  ],
+  "region_filter_summary": {
+    "enabled": true,
+    "selected_regions": [
+      "강원특별자치도"
+    ],
+    "buffer_km": 0.0,
+    "candidate_nodes_before": 10,
+    "candidate_nodes_after": 10,
+    "candidate_edges_before": 10,
+    "candidate_edges_after": 10,
+    "road_nodes_before": 44803,
+    "road_nodes_after": 44803,
+    "road_edges_before": 55266,
+    "road_edges_after": 55266,
+    "cost_grid_cells": 15153,
+    "a_star_calls": 7,
+    "elapsed_seconds": 19.243
+  }
+}

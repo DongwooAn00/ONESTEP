@@ -149,6 +149,26 @@ def calculate_route_costs(
     }
 
 
+def calculate_diversion_rate(
+    distance_saving_ratio: float,
+    time_saving_ratio: float,
+) -> tuple[float, float]:
+    """Return (saving_score, diversion_rate) for a candidate route."""
+    distance_ratio = max(0.0, float(distance_saving_ratio))
+    time_ratio = max(0.0, float(time_saving_ratio))
+    saving_score = (
+        config.DIVERSION_DISTANCE_WEIGHT * distance_ratio
+        + config.DIVERSION_TIME_WEIGHT * time_ratio
+    )
+    if saving_score < config.DIVERSION_MIN_EFFECTIVE_SAVING:
+        return saving_score, 0.0
+    diversion_rate = min(
+        config.DIVERSION_MAX_RATE,
+        max(0.0, saving_score * config.DIVERSION_MULTIPLIER),
+    )
+    return saving_score, diversion_rate
+
+
 def evaluate_candidate_against_baseline(
     candidate: dict,
     baseline: dict | None,
@@ -192,10 +212,30 @@ def evaluate_candidate_against_baseline(
     candidate_time = travel_time_hours(candidate)
     distance_saving = max(0.0, baseline_length - candidate_length)
     time_saving = max(0.0, baseline_time - candidate_time)
-    flow = max(0.0, float(candidate.get("estimated_flow", 0.0)))
+    estimated_flow = max(0.0, float(candidate.get("estimated_flow", 0.0)))
+    distance_saving_ratio = distance_saving / baseline_length if baseline_length > 0 else 0.0
+    time_saving_ratio = time_saving / baseline_time if baseline_time > 0 else 0.0
+    saving_score, diversion_rate = calculate_diversion_rate(
+        distance_saving_ratio,
+        time_saving_ratio,
+    )
+    diverted_flow = estimated_flow * diversion_rate
 
-    annual_time_benefit = time_saving * flow * 365.0 * value_of_time_krw_per_hour / 100_000_000.0
-    annual_distance_benefit = distance_saving * flow * 365.0 * vehicle_cost_krw_per_km / 100_000_000.0
+    annual_time_benefit_before_diversion = (
+        time_saving * estimated_flow * 365.0 * value_of_time_krw_per_hour / 100_000_000.0
+    )
+    annual_distance_benefit_before_diversion = (
+        distance_saving * estimated_flow * 365.0 * vehicle_cost_krw_per_km / 100_000_000.0
+    )
+    annual_benefit_before_diversion = (
+        annual_time_benefit_before_diversion + annual_distance_benefit_before_diversion
+    )
+    annual_time_benefit = (
+        time_saving * diverted_flow * 365.0 * value_of_time_krw_per_hour / 100_000_000.0
+    )
+    annual_distance_benefit = (
+        distance_saving * diverted_flow * 365.0 * vehicle_cost_krw_per_km / 100_000_000.0
+    )
     annual_benefit = annual_time_benefit + annual_distance_benefit
     annuity_factor = (
         (1.0 - (1.0 + discount_rate) ** -analysis_years) / discount_rate
@@ -203,6 +243,7 @@ def evaluate_candidate_against_baseline(
         else float(analysis_years)
     )
     total_benefit = annual_benefit * annuity_factor
+    total_benefit_before_diversion = annual_benefit_before_diversion * annuity_factor
     construction_cost = max(0.0, float(candidate.get("total_screen_cost", 0.0)))
     benefit_cost_ratio = total_benefit / construction_cost if construction_cost > 0 else 0.0
     net_benefit = total_benefit - construction_cost
@@ -213,20 +254,30 @@ def evaluate_candidate_against_baseline(
     tunnel_length = float(candidate.get("tunnel_length_km", 0.0))
     new_length = connector_length + new_road_length + tunnel_length
     new_segment_ratio = new_length / candidate_length if candidate_length > 0 else 0.0
+    existing_road_ratio = existing_length / candidate_length if candidate_length > 0 else 0.0
     tunnel_ratio = tunnel_length / new_length if new_length > 0 else 0.0
     terrain_risk = min(1.0, max(0.0, float(candidate.get("max_slope", 0.0))) / 45.0)
+    is_meaningful_improvement = (
+        candidate.get("route_type") == "existing_baseline"
+        or distance_saving_ratio >= config.MIN_MEANINGFUL_DISTANCE_SAVING_RATIO
+        or time_saving_ratio >= config.MIN_MEANINGFUL_TIME_SAVING_RATIO
+    )
 
     if candidate.get("route_type") == "existing_baseline":
-        score = 0.0
+        # The existing network is the default actionable alternative. New
+        # construction must beat this reference by a meaningful margin.
+        score = 50.0
     else:
-        improvement_score = min(35.0, distance_saving / max(baseline_length, 0.001) * 100.0)
-        time_score = min(30.0, time_saving / max(baseline_time, 0.001) * 100.0)
-        demand_score = min(15.0, math.log1p(flow) / math.log(100_001.0) * 15.0)
-        bc_score = min(20.0, benefit_cost_ratio * 10.0)
-        meaningful_new_build = min(10.0, new_segment_ratio * 20.0)
+        improvement_score = min(30.0, distance_saving_ratio * 100.0)
+        time_score = min(30.0, time_saving_ratio * 100.0)
+        demand_score = min(10.0, math.log1p(diverted_flow) / math.log(100_001.0) * 10.0)
+        bc_score = min(15.0, benefit_cost_ratio * 7.5)
+        existing_utilization_score = existing_road_ratio * 20.0
+        new_construction_penalty = new_segment_ratio * 25.0
         cost_penalty = min(20.0, construction_cost / max(total_benefit, 1.0) * 10.0)
-        tunnel_penalty = max(0.0, tunnel_ratio - 0.45) * 25.0
+        tunnel_penalty = tunnel_ratio * 15.0
         trivial_connector_penalty = 20.0 if new_road_length + tunnel_length < 0.5 else 0.0
+        insufficient_improvement_penalty = 40.0 if not is_meaningful_improvement else 0.0
         score = max(
             0.0,
             min(
@@ -235,27 +286,47 @@ def evaluate_candidate_against_baseline(
                 + time_score
                 + demand_score
                 + bc_score
-                + meaningful_new_build
+                + existing_utilization_score
+                - new_construction_penalty
                 - cost_penalty
                 - tunnel_penalty
                 - terrain_risk * 10.0
-                - trivial_connector_penalty,
+                - trivial_connector_penalty
+                - insufficient_improvement_penalty,
             ),
         )
+        if diversion_rate <= 0.0:
+            score = min(score, 10.0)
 
     candidate.update(
         {
             "existing_length_km": round(existing_length, 3),
             "connector_length_km": round(connector_length, 3),
             "new_road_length_km": round(new_road_length, 3),
+            "access_road_length_km": round(connector_length, 3),
+            "existing_road_ratio": round(existing_road_ratio, 4),
+            "new_construction_ratio": round(new_segment_ratio, 4),
             "construction_cost": round(construction_cost, 3),
+            "estimated_flow": round(estimated_flow, 3),
+            "saving_score": round(saving_score, 4),
+            "diversion_rate": round(diversion_rate, 4),
+            "diverted_flow": round(diverted_flow, 3),
+            "time_saving_hours": round(time_saving, 4),
+            "annual_time_benefit": round(annual_time_benefit, 3),
+            "annual_distance_benefit": round(annual_distance_benefit, 3),
             "annual_benefit": round(annual_benefit, 3),
+            "annual_benefit_before_diversion": round(annual_benefit_before_diversion, 3),
             "total_benefit": round(total_benefit, 3),
+            "total_benefit_before_diversion": round(total_benefit_before_diversion, 3),
             "benefit_cost_ratio": round(benefit_cost_ratio, 3),
+            "bc_ratio": round(benefit_cost_ratio, 3),
             "net_benefit": round(net_benefit, 3),
             "distance_saving_km": round(distance_saving, 3),
             "time_saving_minutes": round(time_saving * 60.0, 2),
+            "distance_saving_ratio": round(distance_saving_ratio, 4),
+            "time_saving_ratio": round(time_saving_ratio, 4),
             "new_segment_ratio": round(new_segment_ratio, 4),
+            "is_meaningful_improvement": is_meaningful_improvement,
             "terrain_risk_penalty": round(terrain_risk, 4),
             "candidate_score": round(score, 2),
             # Legacy ranking name retained for the current frontend.

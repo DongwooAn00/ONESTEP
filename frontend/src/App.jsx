@@ -576,7 +576,12 @@ function RouteMap({
 
     const nodeById = new Map(candidateNodes.map((node) => [node.node_id, node]));
 
-    candidateRouteSegments.forEach((segment) => {
+    // Baseline geometry remains available in the API for comparison, but it
+    // is not a ranked construction candidate and can contain thousands of
+    // road-link vertices. Drawing every baseline at once stalls Kakao Maps.
+    candidateRouteSegments
+      .filter((segment) => !String(segment.route_id || "").endsWith("-B"))
+      .forEach((segment) => {
       const coordinates = segment.segment_geometry || [];
       if (coordinates.length < 2) {
         return;
@@ -591,7 +596,12 @@ function RouteMap({
         tunnel: { color: "#7f57d9", weight: 6, opacity: 0.9, style: "shortdash" }
       }[segment.segment_type] || { color: "#0b7ff3", weight: 5, opacity: 0.82, style: "solid" };
 
-      const path = coordinates
+      const maxMapPoints = 300;
+      const stride = Math.max(1, Math.ceil((coordinates.length - 1) / (maxMapPoints - 1)));
+      const displayCoordinates = stride === 1
+        ? coordinates
+        : coordinates.filter((_, index) => index % stride === 0 || index === coordinates.length - 1);
+      const path = displayCoordinates
         .map((point) => toLatLng(point.lat, point.lon ?? point.lng ?? point.longitude))
         .filter(Boolean);
       if (path.length < 2) {
@@ -966,6 +976,9 @@ function RouteReportDialog({ state, onClose }) {
                 <span>총사업비<strong>{report.metrics.total_project_cost == null ? "현재 산정 불가" : formatMoneyEok(report.metrics.total_project_cost)}</strong></span>
                 <span>총편익<strong>{report.metrics.benefit == null ? "현재 산정 불가" : formatMoneyEok(report.metrics.benefit)}</strong></span>
                 <span>B/C<strong>{report.metrics.benefit_cost_ratio == null ? "현재 산정 불가" : report.metrics.benefit_cost_ratio.toFixed(2)}</strong></span>
+                <span>잠재 수요<strong>{report.metrics.estimated_flow == null ? "현재 산정 불가" : formatNumber(report.metrics.estimated_flow)}</strong></span>
+                <span>전환률<strong>{report.metrics.diversion_rate == null ? "현재 산정 불가" : `${(report.metrics.diversion_rate * 100).toFixed(1)}%`}</strong></span>
+                <span>전환 수요<strong>{report.metrics.diverted_flow == null ? "현재 산정 불가" : formatNumber(report.metrics.diverted_flow)}</strong></span>
               </div>
 
               {[
@@ -1784,6 +1797,7 @@ function PostList({ posts, onLikePost }) {
 function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const [analysisStatus, setAnalysisStatus] = useState("idle");
   const [routeStatus, setRouteStatus] = useState("idle");
+  const [routeElapsedSeconds, setRouteElapsedSeconds] = useState(0);
   const [columnWidths, setColumnWidths] = useState({ left: 520, right: 380 });
   const [uploadedFile, setUploadedFile] = useState(null);
   const [includeBaseOd, setIncludeBaseOd] = useState(true);
@@ -1854,6 +1868,18 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
       setSelectedScenarioIds((current) => (current.length ? current : [selectedScenarioId]));
     }
   }, [selectedScenarioId]);
+
+  useEffect(() => {
+    if (routeStatus !== "loading") {
+      return undefined;
+    }
+    const startedAt = Date.now();
+    setRouteElapsedSeconds(0);
+    const timer = window.setInterval(() => {
+      setRouteElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [routeStatus]);
 
   const toggleScenarioSelection = useCallback((scenarioId) => {
     setSelectedScenarioIds((current) =>
@@ -2235,7 +2261,9 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
             disabled={analysisStatus !== "success" || routeStatus === "loading"}
           >
             <Play size={18} fill="currentColor" />
-            {routeStatus === "loading" ? "예비 노선 산정 중" : "MVP 예비 후보 노선 산정"}
+            {routeStatus === "loading"
+              ? `도로·터널 후보 생성 중 (${routeElapsedSeconds}초)`
+              : "도로·터널 후보 생성"}
           </button>
           {routeErrorMessage && <p className="status-text error-copy">{routeErrorMessage}</p>}
         </div>

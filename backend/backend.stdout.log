@@ -1,0 +1,8 @@
+INFO:     127.0.0.1:10895 - "GET /docs HTTP/1.1" 200 OK
+INFO:     127.0.0.1:14721 - "POST /api/od-candidates HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4981 - "OPTIONS /api/candidate-routes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:4981 - "POST /api/candidate-routes HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8521 - "POST /api/land-prices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8527 - "POST /api/land-prices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8540 - "POST /api/land-prices HTTP/1.1" 200 OK
+INFO:     127.0.0.1:8547 - "POST /api/land-prices HTTP/1.1" 200 OK

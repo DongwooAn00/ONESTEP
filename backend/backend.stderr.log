@@ -1,0 +1,6 @@
+INFO:     Started server process [3980]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+[RoadSnap] R002-B: 후보 정점 N023의 최근접 도로 노드 542511까지 스냅 거리가 1.65 km로 허용거리 1.00 km를 초과합니다.
+[RoadSnap] R004-B: 후보 정점 N026의 최근접 도로 노드 486696까지 스냅 거리가 2.79 km로 허용거리 1.00 km를 초과합니다.

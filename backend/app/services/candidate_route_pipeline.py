@@ -4,12 +4,18 @@ import json
 import logging
 import math
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from pathlib import Path
 
 from app.schemas.od_candidates import CandidateEdge, CandidateNode
 from app.services import route_mvp_config as config
-from app.services.cost_grid import DemProvider, generate_dem_route_grid, lon_lat_to_dem
+from app.services.cost_grid import (
+    DemProvider,
+    PostgisDemProvider,
+    generate_dem_route_grid,
+    lon_lat_to_dem,
+)
 from app.services.cost_model import calculate_route_costs, evaluate_candidate_against_baseline
 from app.services.land_compensation import (
     NullParcelRepository,
@@ -19,6 +25,7 @@ from app.services.land_compensation import (
 from app.services.pathfinding import find_least_cost_path
 from app.services.region_filter import RegionContext, build_region_context
 from app.services.road_graph_routing import build_road_graph_route
+from app.services.road_network import snap_geometry_to_road_centerline
 from app.services.route_economics import rank_candidate_routes
 from app.services.route_segments import RouteSegmentDetail, classify_route_segments
 
@@ -54,6 +61,21 @@ def _route_geometry(cells) -> list[dict[str, float]]:
     return [{"lat": cell.lat, "lon": cell.lon} for cell in cells]
 
 
+def _simplify_coordinate_sequence(
+    coordinates: list[dict[str, float]],
+    *,
+    max_points: int,
+) -> list[dict[str, float]]:
+    """Bound display payload size while preserving endpoints and route order."""
+    if len(coordinates) <= max_points:
+        return coordinates
+    step = math.ceil((len(coordinates) - 1) / (max_points - 1))
+    simplified = coordinates[::step]
+    if simplified[-1] != coordinates[-1]:
+        simplified.append(coordinates[-1])
+    return simplified
+
+
 def _empty_land_compensation(road_width_m: float = DEFAULT_ROAD_WIDTH_M) -> dict:
     return {
         "total_land_compensation": 0.0,
@@ -63,6 +85,14 @@ def _empty_land_compensation(road_width_m: float = DEFAULT_ROAD_WIDTH_M) -> dict
         "official_count": 0,
         "estimated_count": 0,
         "source_counts": {},
+        "land_compensation_total": 0.0,
+        "land_compensation_by_land_type": {
+            "forest": 0.0,
+            "farmland": 0.0,
+            "residential": 0.0,
+            "commercial_industrial": 0.0,
+            "unknown": 0.0,
+        },
         "items": [],
         "warnings": [],
     }
@@ -107,6 +137,10 @@ def _base_row(
         "road_edges_after": 0,
         "cost_grid_cell_count": 0,
         "a_star_call_count": 0,
+        "origin_road_node_id": None,
+        "destination_road_node_id": None,
+        "origin_snap_distance_m": None,
+        "destination_snap_distance_m": None,
         "land_compensation": _empty_land_compensation(),
         **calculate_route_costs(0.0, 0.0),
     }
@@ -138,10 +172,47 @@ def _renumber_segments(route_id: str, segments: list[dict]) -> list[dict]:
 
 
 def _segment_rows(route_id: str, details: list[RouteSegmentDetail]) -> list[dict]:
-    return _renumber_segments(
+    rows = _renumber_segments(
         route_id,
         [{"route_id": route_id, **asdict(item)} for item in details],
     )
+    existing_indexes = [
+        index
+        for index, row in enumerate(rows)
+        if row.get("segment_type") == "existing_road"
+        and len(row.get("segment_geometry", [])) >= 2
+    ]
+    if not existing_indexes:
+        return rows
+
+    flat_geometry: list[dict[str, float]] = []
+    slices: dict[int, tuple[int, int]] = {}
+    for index in existing_indexes:
+        start = len(flat_geometry)
+        flat_geometry.extend(rows[index]["segment_geometry"])
+        slices[index] = (start, len(flat_geometry))
+    try:
+        snapped, snap_mask = snap_geometry_to_road_centerline(
+            flat_geometry,
+            max_distance_m=config.EXISTING_ROAD_CLASSIFICATION_DISTANCE_M,
+        )
+    except Exception as error:
+        logger.warning("%s existing-road geometry snap failed: %s", route_id, error)
+        return rows
+
+    for index in existing_indexes:
+        start, end = slices[index]
+        if all(snap_mask[start:end]):
+            geometry = snapped[start:end]
+            rows[index]["segment_geometry"] = geometry
+            rows[index]["segment_length_km"] = _geometry_length_km(geometry)
+            rows[index]["geometry_source"] = "road_centerline_snap"
+        else:
+            # Never paint a partially unmatched DEM line as an existing road.
+            rows[index]["segment_type"] = "new_surface_road"
+            rows[index]["final_segment_type"] = "new_surface_road"
+            rows[index]["decision_status"] = "road_centerline_snap_failed"
+    return rows
 
 
 def _project_route_geometry(route_geometry: list[dict[str, float]]):
@@ -152,6 +223,27 @@ def _project_route_geometry(route_geometry: list[dict[str, float]]):
     if len(points) < 2:
         raise ValueError("토지보상비 계산에는 경로 좌표가 2개 이상 필요합니다.")
     return LineString([(point.x, point.y) for point in points])
+
+
+def _project_new_build_geometry(row: dict):
+    """Preserve disconnected construction segments as a MultiLineString."""
+    from shapely.geometry import MultiLineString
+
+    lines = []
+    for segment in row.get("segment_details", []):
+        if segment.get("segment_type") not in {"connector", "new_surface_road"}:
+            continue
+        geometry = segment.get("segment_geometry", [])
+        if len(geometry) < 2:
+            continue
+        points = [
+            lon_lat_to_dem(point["lon"], point["lat"])
+            for point in geometry
+        ]
+        lines.append([(point.x, point.y) for point in points])
+    if not lines:
+        raise ValueError("토지보상비 계산 대상 신규 건설 구간이 없습니다.")
+    return MultiLineString(lines)
 
 
 def _new_build_geometry(row: dict) -> list[dict[str, float]]:
@@ -192,7 +284,7 @@ def _apply_land_compensation(
             route_geom = (
                 new_build_geometry
                 if parcel_repository is None
-                else _project_route_geometry(new_build_geometry)
+                else _project_new_build_geometry(row)
             )
             compensation = estimate_land_compensation(
                 route_geom,
@@ -255,6 +347,10 @@ def _baseline_candidate(
             "road_edges_before": graph_route.road_edges_before,
             "road_edges_after": graph_route.road_edges_after,
             "a_star_call_count": 1,
+            "origin_road_node_id": getattr(graph_route, "origin_road_node_id", None),
+            "destination_road_node_id": getattr(graph_route, "destination_road_node_id", None),
+            "origin_snap_distance_m": getattr(graph_route, "origin_snap_distance_m", None),
+            "destination_snap_distance_m": getattr(graph_route, "destination_snap_distance_m", None),
             "explanation": [
                 "기존 도로망 A* 경로이며 신규 후보의 거리·시간·편익 비교 기준입니다.",
                 "기존 도로 구간의 신규 건설비는 0으로 계산했습니다.",
@@ -315,6 +411,34 @@ def _dem_link(
     route_length_km = _route_length_km_from_cells(path.cells)
     segment_summary = classify_route_segments(route_id, path.cells)
     details = _segment_rows(route_id, segment_summary["segment_details"])
+    existing_road_length_km = round(
+        sum(
+            detail["segment_length_km"]
+            for detail in details
+            if detail["segment_type"] == "existing_road"
+        ),
+        3,
+    )
+    new_surface_road_length_km = round(
+        sum(
+            detail["segment_length_km"]
+            for detail in details
+            if detail["segment_type"] == "new_surface_road"
+        ),
+        3,
+    )
+    tunnel_length_km = round(
+        sum(
+            detail["segment_length_km"]
+            for detail in details
+            if detail["segment_type"] == "tunnel"
+        ),
+        3,
+    )
+    route_length_km = round(
+        existing_road_length_km + new_surface_road_length_km + tunnel_length_km,
+        3,
+    )
     crossing_review_required = bool(segment_summary["crossing_review_required"])
     explanation = [
         "기존 도로 저비용 편향 없이 DEM 비용격자 A*로 생성한 신규 링크입니다.",
@@ -328,9 +452,10 @@ def _dem_link(
         {
             "route_geometry": _route_geometry(path.cells),
             "route_length_km": route_length_km,
-            "new_surface_road_length_km": segment_summary["new_surface_road_length_km"],
-            "surface_road_length_km": segment_summary["new_surface_road_length_km"],
-            "tunnel_length_km": segment_summary["tunnel_length_km"],
+            "existing_road_length_km": existing_road_length_km,
+            "new_surface_road_length_km": new_surface_road_length_km,
+            "surface_road_length_km": new_surface_road_length_km,
+            "tunnel_length_km": tunnel_length_km,
             "tunnel_segment_count": segment_summary["tunnel_segment_count"],
             "total_grid_cost": path.total_grid_cost,
             "average_slope": round(
@@ -411,17 +536,60 @@ def _simple_segment(
 
 def _baseline_context_segments(
     route_id: str,
-    prefix: list[dict[str, float]],
-    suffix: list[dict[str, float]],
+    baseline: dict,
+    start_index: int,
+    end_index: int,
 ) -> list[dict]:
+    geometry = baseline["route_geometry"]
+    baseline_segments = baseline.get("segment_details", [])
+    start_connector = next(
+        (
+            segment
+            for segment in baseline_segments
+            if segment.get("segment_type") == "connector"
+        ),
+        None,
+    )
+    end_connector = next(
+        (
+            segment
+            for segment in reversed(baseline_segments)
+            if segment.get("segment_type") == "connector"
+        ),
+        None,
+    )
+    start_road_index = max(
+        0,
+        len((start_connector or {}).get("segment_geometry", [])) - 1,
+    )
+    end_road_index = min(
+        len(geometry) - 1,
+        len(geometry) - len((end_connector or {}).get("segment_geometry", [])),
+    )
     segments: list[dict] = []
-    if len(prefix) >= 2:
-        connector = _simple_segment(route_id, "connector", prefix[:2])
-        existing = _simple_segment(route_id, "existing_road", prefix[1:])
+    if start_index >= 1:
+        connector = _simple_segment(
+            route_id,
+            "connector",
+            geometry[: start_road_index + 1],
+        )
+        existing = _simple_segment(
+            route_id,
+            "existing_road",
+            geometry[start_road_index : start_index + 1],
+        )
         segments.extend(item for item in (connector, existing) if item)
-    if len(suffix) >= 2:
-        existing = _simple_segment(route_id, "existing_road", suffix[:-1])
-        connector = _simple_segment(route_id, "connector", suffix[-2:])
+    if end_index < len(geometry) - 1:
+        existing = _simple_segment(
+            route_id,
+            "existing_road",
+            geometry[end_index : end_road_index + 1],
+        )
+        connector = _simple_segment(
+            route_id,
+            "connector",
+            geometry[end_road_index:],
+        )
         segments.extend(item for item in (existing, connector) if item)
     return segments
 
@@ -458,7 +626,12 @@ def _hybrid_candidate(
         buffer_multiplier=buffer_multiplier,
     )
 
-    context_segments = _baseline_context_segments(route_id, prefix, suffix)
+    context_segments = _baseline_context_segments(
+        route_id,
+        baseline,
+        start_index,
+        end_index,
+    )
     shortcut_segments = shortcut["segment_details"]
     segments = _renumber_segments(route_id, context_segments + shortcut_segments)
     combined_geometry = prefix + shortcut["route_geometry"][1:-1] + suffix
@@ -542,9 +715,12 @@ def evaluate_candidate_edge_candidates(
         except Exception as error:
             logger.warning("%s baseline generation failed: %s", prefix, error)
 
-    try:
-        candidates.append(
-            _new_direct_candidate(
+    direct_candidate: dict | None = None
+    search_jobs: list[tuple[str, str, object]] = [
+        (
+            "D",
+            "new_direct",
+            lambda: _new_direct_candidate(
                 edge,
                 nodes,
                 route_id=f"{prefix}-D",
@@ -552,35 +728,96 @@ def evaluate_candidate_edge_candidates(
                 apply_optional_layers=apply_optional_layers,
                 region_context=region_context,
                 buffer_multiplier=buffer_multiplier,
-            )
+            ),
         )
-    except Exception as error:
-        candidates.append(_failed_route(edge, f"{prefix}-D", "new_direct", str(error)))
-
+    ]
     if baseline is not None:
-        hybrid_specs = [
+        for suffix, route_type, start_fraction, end_fraction, active_buffer in (
             ("H", "hybrid_new_existing", 0.20, 0.70, buffer_multiplier),
             ("P", "bypass_improvement", 0.35, 0.85, buffer_multiplier * 0.75),
-            ("T", "tunnel_shortcut", 0.15, 0.85, max(0.08, buffer_multiplier * 0.4)),
-        ]
-        for suffix, route_type, start_fraction, end_fraction, active_buffer in hybrid_specs:
-            try:
-                candidate = _hybrid_candidate(
-                    edge,
-                    baseline,
-                    route_id=f"{prefix}-{suffix}",
+        ):
+            search_jobs.append(
+                (
+                    suffix,
+                    route_type,
+                    lambda suffix=suffix,
                     route_type=route_type,
                     start_fraction=start_fraction,
                     end_fraction=end_fraction,
-                    dem_provider=dem_provider,
-                    apply_optional_layers=apply_optional_layers,
-                    region_context=region_context,
-                    buffer_multiplier=active_buffer,
+                    active_buffer=active_buffer: _hybrid_candidate(
+                        edge,
+                        baseline,
+                        route_id=f"{prefix}-{suffix}",
+                        route_type=route_type,
+                        start_fraction=start_fraction,
+                        end_fraction=end_fraction,
+                        dem_provider=dem_provider,
+                        apply_optional_layers=apply_optional_layers,
+                        region_context=region_context,
+                        buffer_multiplier=active_buffer,
+                    ),
                 )
-                if route_type != "tunnel_shortcut" or candidate["tunnel_length_km"] > 0:
-                    candidates.append(candidate)
+            )
+
+    completed: dict[str, dict] = {}
+    with ThreadPoolExecutor(
+        max_workers=min(config.MAX_PARALLEL_ROUTE_SEARCHES, len(search_jobs))
+    ) as executor:
+        futures = {
+            executor.submit(job): (suffix, route_type)
+            for suffix, route_type, job in search_jobs
+        }
+        for future in as_completed(futures):
+            suffix, route_type = futures[future]
+            try:
+                completed[suffix] = future.result()
             except Exception as error:
-                logger.warning("%s %s generation failed: %s", prefix, route_type, error)
+                if route_type == "new_direct":
+                    completed[suffix] = _failed_route(
+                        edge,
+                        f"{prefix}-D",
+                        "new_direct",
+                        str(error),
+                    )
+                else:
+                    logger.warning(
+                        "%s %s generation failed: %s",
+                        prefix,
+                        route_type,
+                        error,
+                    )
+
+    for suffix in ("D", "H", "P"):
+        candidate = completed.get(suffix)
+        if candidate is not None:
+            candidates.append(candidate)
+    direct_candidate = completed.get("D")
+
+    # A dedicated tunnel shortcut is expensive and commonly discarded. Run it
+    # only after the direct route confirms that tunnel conditions exist.
+    if (
+        baseline is not None
+        and direct_candidate is not None
+        and direct_candidate.get("status") == "success"
+        and direct_candidate.get("tunnel_length_km", 0.0) > 0
+    ):
+        try:
+            tunnel_candidate = _hybrid_candidate(
+                edge,
+                baseline,
+                route_id=f"{prefix}-T",
+                route_type="tunnel_shortcut",
+                start_fraction=0.15,
+                end_fraction=0.85,
+                dem_provider=dem_provider,
+                apply_optional_layers=apply_optional_layers,
+                region_context=region_context,
+                buffer_multiplier=max(0.08, buffer_multiplier * 0.4),
+            )
+            if tunnel_candidate["tunnel_length_km"] > 0:
+                candidates.append(tunnel_candidate)
+        except Exception as error:
+            logger.warning("%s tunnel_shortcut generation failed: %s", prefix, error)
 
     if baseline is not None:
         evaluate_candidate_against_baseline(baseline, baseline)
@@ -612,14 +849,20 @@ def _write_json(filename: str, payload) -> str:
 
 
 def _public_route(row: dict) -> dict:
+    display_geometry = _simplify_coordinate_sequence(
+        row["route_geometry"],
+        max_points=500,
+    )
+    land_compensation = row.get("land_compensation", _empty_land_compensation())
     return {
         "route_id": row["route_id"],
         "route_type": row["route_type"],
         "from_node_id": row["from_node_id"],
         "to_node_id": row["to_node_id"],
-        "route_geometry": row["route_geometry"],
-        "geometry": row["route_geometry"],
-        "segments": row["segment_details"],
+        "route_geometry": display_geometry,
+        "geometry": display_geometry,
+        # Segment geometry is returned once in the top-level `segments` array.
+        "segments": [],
         "route_length_km": row["route_length_km"],
         "total_length": row["route_length_km"],
         "existing_length": row.get("existing_road_length_km", 0.0),
@@ -630,16 +873,40 @@ def _public_route(row: dict) -> dict:
         "new_surface_road_length_km": row.get("new_surface_road_length_km", 0.0),
         "tunnel_length": row.get("tunnel_length_km", 0.0),
         "tunnel_length_km": row.get("tunnel_length_km", 0.0),
+        "estimated_flow": row.get("estimated_flow", 0.0),
+        "saving_score": row.get("saving_score", 0.0),
+        "diversion_rate": row.get("diversion_rate", 0.0),
+        "diverted_flow": row.get("diverted_flow", 0.0),
+        "access_road_length_km": row.get("connector_length_km", 0.0),
+        "existing_road_ratio": row.get("existing_road_ratio", 0.0),
+        "new_construction_ratio": row.get("new_construction_ratio", 0.0),
         "construction_cost": row.get("construction_cost", row.get("total_screen_cost", 0.0)),
+        "land_compensation_total": land_compensation.get(
+            "land_compensation_total",
+            land_compensation.get("total_land_compensation", 0.0),
+        ),
+        "land_compensation_by_land_type": land_compensation.get(
+            "land_compensation_by_land_type",
+            {},
+        ),
         "annual_benefit": row.get("annual_benefit", 0.0),
+        "annual_time_benefit": row.get("annual_time_benefit", 0.0),
+        "annual_distance_benefit": row.get("annual_distance_benefit", 0.0),
+        "annual_benefit_before_diversion": row.get("annual_benefit_before_diversion", 0.0),
         "total_benefit": row.get("total_benefit", 0.0),
+        "total_benefit_before_diversion": row.get("total_benefit_before_diversion", 0.0),
         "benefit_cost_ratio": row.get("benefit_cost_ratio", 0.0),
+        "bc_ratio": row.get("bc_ratio", row.get("benefit_cost_ratio", 0.0)),
         "net_benefit": row.get("net_benefit", 0.0),
         "distance_saving": row.get("distance_saving_km", 0.0),
         "distance_saving_km": row.get("distance_saving_km", 0.0),
         "time_saving": row.get("time_saving_minutes", 0.0),
         "time_saving_minutes": row.get("time_saving_minutes", 0.0),
+        "time_saving_hours": row.get("time_saving_hours", 0.0),
         "new_segment_ratio": row.get("new_segment_ratio", 0.0),
+        "distance_saving_ratio": row.get("distance_saving_ratio", 0.0),
+        "time_saving_ratio": row.get("time_saving_ratio", 0.0),
+        "is_meaningful_improvement": row.get("is_meaningful_improvement", False),
         "candidate_score": row.get("candidate_score", 0.0),
         "explanation": row.get("explanation", []),
         "crossing_review_required": row.get("crossing_review_required", False),
@@ -651,6 +918,10 @@ def _public_route(row: dict) -> dict:
         if row["route_length_km"] > 0
         else 0.0,
         "route_generation_method": row["route_generation_method"],
+        "origin_road_node_id": row.get("origin_road_node_id"),
+        "destination_road_node_id": row.get("destination_road_node_id"),
+        "origin_snap_distance_m": row.get("origin_snap_distance_m"),
+        "destination_snap_distance_m": row.get("destination_snap_distance_m"),
         "status": row["status"],
         "failed_reason": row["failed_reason"],
     }
@@ -681,11 +952,18 @@ def _public_cost(row: dict) -> dict:
 
 
 def _build_output_files(rows: list[dict], ranked_rows: list[dict]) -> dict[str, list[dict]]:
+    public_segments = []
+    for row in rows:
+        for segment in row["segment_details"]:
+            public_segment = dict(segment)
+            public_segment["segment_geometry"] = _simplify_coordinate_sequence(
+                segment.get("segment_geometry", []),
+                max_points=300,
+            )
+            public_segments.append(public_segment)
     return {
         "candidate_routes.json": [_public_route(row) for row in rows],
-        "candidate_route_segments.json": [
-            segment for row in rows for segment in row["segment_details"]
-        ],
+        "candidate_route_segments.json": public_segments,
         "candidate_route_costs.json": [_public_cost(row) for row in rows],
         "ranked_candidate_routes.json": ranked_rows,
     }
@@ -740,6 +1018,7 @@ def build_candidate_routes(
         key=lambda edge: edge.estimated_flow,
         reverse=True,
     )
+    active_dem_provider = dem_provider or PostgisDemProvider()
 
     generated_rows: list[dict] = []
     evaluated_edges: list[CandidateEdge] = []
@@ -749,7 +1028,7 @@ def build_candidate_routes(
         edge_candidates = evaluate_candidate_edge_candidates(
             edge,
             active_nodes,
-            dem_provider=dem_provider,
+            dem_provider=active_dem_provider,
             apply_optional_layers=apply_optional_layers,
             region_context=region_context,
         )
@@ -770,11 +1049,46 @@ def build_candidate_routes(
         for row in processed:
             if row["status"] == "success":
                 evaluate_candidate_against_baseline(row, baseline)
+                logger.info(
+                    "[CandidateRoute] candidate_id=%s origin_node_id=%s "
+                    "destination_node_id=%s straight_distance_km=%.3f "
+                    "existing_baseline_length_km=%.3f final_route_length_km=%.3f "
+                    "existing_road_length_km=%.3f new_road_length_km=%.3f "
+                    "tunnel_length_km=%.3f existing_road_ratio=%.4f "
+                    "distance_saving_ratio=%.4f time_saving_ratio=%.4f "
+                    "construction_cost=%.3f candidate_score=%.2f "
+                    "route_generation_method=%s estimated_flow=%.3f "
+                    "saving_score=%.4f diversion_rate=%.4f diverted_flow=%.3f "
+                    "annual_benefit=%.3f total_benefit=%.3f bc_ratio=%.3f",
+                    row["route_id"],
+                    row["from_node_id"],
+                    row["to_node_id"],
+                    row.get("straight_distance_km", 0.0),
+                    baseline.get("route_length_km", 0.0) if baseline else 0.0,
+                    row.get("route_length_km", 0.0),
+                    row.get("existing_road_length_km", 0.0),
+                    row.get("new_surface_road_length_km", 0.0),
+                    row.get("tunnel_length_km", 0.0),
+                    row.get("existing_road_ratio", 0.0),
+                    row.get("distance_saving_ratio", 0.0),
+                    row.get("time_saving_ratio", 0.0),
+                    row.get("construction_cost", 0.0),
+                    row.get("candidate_score", 0.0),
+                    row.get("route_generation_method", "unknown"),
+                    row.get("estimated_flow", 0.0),
+                    row.get("saving_score", 0.0),
+                    row.get("diversion_rate", 0.0),
+                    row.get("diverted_flow", 0.0),
+                    row.get("annual_benefit", 0.0),
+                    row.get("total_benefit", 0.0),
+                    row.get("bc_ratio", 0.0),
+                )
         generated_rows.extend(processed)
         successful_new_count += sum(
             1
             for row in processed
-            if row["status"] == "success" and row["route_type"] != "existing_baseline"
+            if row["status"] == "success"
+            and row["route_type"] != "existing_baseline"
         )
         if successful_new_count >= active_limit:
             break
@@ -796,11 +1110,7 @@ def build_candidate_routes(
         or (not ranked_rows and row["status"] == "failed")
     ]
     best_row = max(
-        (
-            row
-            for row in rows
-            if row["status"] == "success" and row["route_type"] != "existing_baseline"
-        ),
+        (row for row in rows if row["status"] == "success"),
         key=lambda row: row.get("candidate_score", 0.0),
         default=None,
     )

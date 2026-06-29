@@ -1,14 +1,14 @@
 [
   {
     "route_id": "R001-B",
-    "existing_road_length_km": 8.145,
-    "connector_length_km": 0.383,
+    "existing_road_length_km": 136.104,
+    "connector_length_km": 0.948,
     "new_surface_road_length_km": 0.0,
     "surface_road_length_km": 0.0,
     "tunnel_length_km": 0.0,
     "surface_road_cost": 0.0,
     "new_road_cost": 0.0,
-    "connector_cost": 70.472,
+    "connector_cost": 174.432,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -28,15 +28,15 @@
         "selected_regions": [
           "강원특별자치도"
         ],
-        "buffer_km": 10.0
+        "buffer_km": 0.0
       }
     },
-    "total_direct_cost": 70.472,
+    "total_direct_cost": 174.432,
     "surface_road_screen_cost": 0.0,
     "new_road_screen_cost": 0.0,
-    "connector_screen_cost": 88.09,
+    "connector_screen_cost": 218.04,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 88.09,
+    "total_screen_cost": 218.04,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -53,13 +53,13 @@
   },
   {
     "route_id": "R001-D",
-    "existing_road_length_km": 0.0,
+    "existing_road_length_km": 4.538,
     "connector_length_km": 0.0,
-    "new_surface_road_length_km": 5.536,
-    "surface_road_length_km": 5.536,
+    "new_surface_road_length_km": 102.457,
+    "surface_road_length_km": 102.457,
     "tunnel_length_km": 0,
-    "surface_road_cost": 1018.624,
-    "new_road_cost": 1018.624,
+    "surface_road_cost": 18852.088,
+    "new_road_cost": 18852.088,
     "connector_cost": 0.0,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
@@ -80,15 +80,15 @@
         "selected_regions": [
           "강원특별자치도"
         ],
-        "buffer_km": 10.0
+        "buffer_km": 0.0
       }
     },
-    "total_direct_cost": 1018.624,
-    "surface_road_screen_cost": 1273.28,
-    "new_road_screen_cost": 1273.28,
+    "total_direct_cost": 18852.088,
+    "surface_road_screen_cost": 23565.11,
+    "new_road_screen_cost": 23565.11,
     "connector_screen_cost": 0.0,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 1273.28,
+    "total_screen_cost": 23565.11,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -105,14 +105,14 @@
   },
   {
     "route_id": "R001-H",
-    "existing_road_length_km": 4.563,
-    "connector_length_km": 0.413,
-    "new_surface_road_length_km": 2.621,
-    "surface_road_length_km": 2.621,
+    "existing_road_length_km": 55.811,
+    "connector_length_km": 0.948,
+    "new_surface_road_length_km": 70.681,
+    "surface_road_length_km": 70.681,
     "tunnel_length_km": 0,
-    "surface_road_cost": 482.264,
-    "new_road_cost": 482.264,
-    "connector_cost": 75.992,
+    "surface_road_cost": 13005.304,
+    "new_road_cost": 13005.304,
+    "connector_cost": 174.432,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -132,15 +132,15 @@
         "selected_regions": [
           "강원특별자치도"
         ],
-        "buffer_km": 10.0
+        "buffer_km": 0.0
       }
     },
-    "total_direct_cost": 558.256,
-    "surface_road_screen_cost": 602.83,
-    "new_road_screen_cost": 602.83,
-    "connector_screen_cost": 94.99,
+    "total_direct_cost": 13179.736,
+    "surface_road_screen_cost": 16256.63,
+    "new_road_screen_cost": 16256.63,
+    "connector_screen_cost": 218.04,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 697.82,
+    "total_screen_cost": 16474.67,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -157,14 +157,14 @@
   },
   {
     "route_id": "R001-P",
-    "existing_road_length_km": 4.689,
-    "connector_length_km": 0.413,
-    "new_surface_road_length_km": 3.621,
-    "surface_road_length_km": 3.621,
+    "existing_road_length_km": 60.14,
+    "connector_length_km": 0.948,
+    "new_surface_road_length_km": 74.161,
+    "surface_road_length_km": 74.161,
     "tunnel_length_km": 0,
-    "surface_road_cost": 666.264,
-    "new_road_cost": 666.264,
-    "connector_cost": 75.992,
+    "surface_road_cost": 13645.624,
+    "new_road_cost": 13645.624,
+    "connector_cost": 174.432,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -184,15 +184,15 @@
         "selected_regions": [
           "강원특별자치도"
         ],
-        "buffer_km": 10.0
+        "buffer_km": 0.0
       }
     },
-    "total_direct_cost": 742.256,
-    "surface_road_screen_cost": 832.83,
-    "new_road_screen_cost": 832.83,
-    "connector_screen_cost": 94.99,
+    "total_direct_cost": 13820.056,
+    "surface_road_screen_cost": 17057.03,
+    "new_road_screen_cost": 17057.03,
+    "connector_screen_cost": 218.04,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 927.82,
+    "total_screen_cost": 17275.07,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -209,14 +209,14 @@
   },
   {
     "route_id": "R002-B",
-    "existing_road_length_km": 13.654,
-    "connector_length_km": 0.531,
+    "existing_road_length_km": 121.04,
+    "connector_length_km": 1.597,
     "new_surface_road_length_km": 0.0,
     "surface_road_length_km": 0.0,
     "tunnel_length_km": 0.0,
     "surface_road_cost": 0.0,
     "new_road_cost": 0.0,
-    "connector_cost": 97.704,
+    "connector_cost": 293.848,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -236,15 +236,15 @@
         "selected_regions": [
           "강원특별자치도"
         ],
-        "buffer_km": 10.0
+        "buffer_km": 0.0
       }
     },
-    "total_direct_cost": 97.704,
+    "total_direct_cost": 293.848,
     "surface_road_screen_cost": 0.0,
     "new_road_screen_cost": 0.0,
-    "connector_screen_cost": 122.13,
+    "connector_screen_cost": 367.31,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 122.13,
+    "total_screen_cost": 367.31,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -261,66 +261,14 @@
   },
   {
     "route_id": "R002-D",
-    "existing_road_length_km": 0.0,
+    "existing_road_length_km": 0,
     "connector_length_km": 0.0,
-    "new_surface_road_length_km": 2.5,
-    "surface_road_length_km": 2.5,
-    "tunnel_length_km": 5.036,
-    "surface_road_cost": 460.0,
-    "new_road_cost": 460.0,
-    "connector_cost": 0.0,
-    "tunnel_cost": 1034.916,
-    "land_compensation_cost": 0.0,
-    "land_compensation": {
-      "total_land_compensation": 0.0,
-      "factor": 1.5,
-      "road_width_m": 20.0,
-      "parcel_count": 0,
-      "official_count": 0,
-      "estimated_count": 0,
-      "source_counts": {},
-      "items": [],
-      "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
-      ],
-      "region_filter": {
-        "enabled": true,
-        "selected_regions": [
-          "강원특별자치도"
-        ],
-        "buffer_km": 10.0
-      }
-    },
-    "total_direct_cost": 1494.916,
-    "surface_road_screen_cost": 575.0,
-    "new_road_screen_cost": 575.0,
-    "connector_screen_cost": 0.0,
-    "tunnel_screen_cost": 1397.136,
-    "total_screen_cost": 1972.136,
-    "cost_assumptions": {
-      "unit": "eok_krw",
-      "road_unit_cost_eok_per_km": 184.0,
-      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
-      "f_urban": 1.0,
-      "f_speed": 1.0,
-      "f_ground": 1.3,
-      "f_length": 1.08,
-      "f_aux": 1.05,
-      "road_contingency": 0.25,
-      "tunnel_contingency": 0.35,
-      "land_compensation_unit": "eok_krw"
-    }
-  },
-  {
-    "route_id": "R002-H",
-    "existing_road_length_km": 7.109,
-    "connector_length_km": 0.217,
-    "new_surface_road_length_km": 7.036,
-    "surface_road_length_km": 7.036,
+    "new_surface_road_length_km": 108.657,
+    "surface_road_length_km": 108.657,
     "tunnel_length_km": 0,
-    "surface_road_cost": 1294.624,
-    "new_road_cost": 1294.624,
-    "connector_cost": 39.928,
+    "surface_road_cost": 19992.888,
+    "new_road_cost": 19992.888,
+    "connector_cost": 0.0,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -340,15 +288,67 @@
         "selected_regions": [
           "강원특별자치도"
         ],
-        "buffer_km": 10.0
+        "buffer_km": 0.0
       }
     },
-    "total_direct_cost": 1334.552,
-    "surface_road_screen_cost": 1618.28,
-    "new_road_screen_cost": 1618.28,
-    "connector_screen_cost": 49.91,
+    "total_direct_cost": 19992.888,
+    "surface_road_screen_cost": 24991.11,
+    "new_road_screen_cost": 24991.11,
+    "connector_screen_cost": 0.0,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 1668.19,
+    "total_screen_cost": 24991.11,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R002-H",
+    "existing_road_length_km": 49.406,
+    "connector_length_km": 1.598,
+    "new_surface_road_length_km": 70.768,
+    "surface_road_length_km": 70.768,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 13021.312,
+    "new_road_cost": 13021.312,
+    "connector_cost": 294.032,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "items": [],
+      "warnings": [
+        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "강원특별자치도"
+        ],
+        "buffer_km": 0.0
+      }
+    },
+    "total_direct_cost": 13315.344,
+    "surface_road_screen_cost": 16276.64,
+    "new_road_screen_cost": 16276.64,
+    "connector_screen_cost": 367.54,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 16644.18,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -365,118 +365,14 @@
   },
   {
     "route_id": "R002-P",
-    "existing_road_length_km": 6.871,
-    "connector_length_km": 0.217,
-    "new_surface_road_length_km": 5.414,
-    "surface_road_length_km": 5.414,
-    "tunnel_length_km": 2.621,
-    "surface_road_cost": 996.176,
-    "new_road_cost": 996.176,
-    "connector_cost": 39.928,
-    "tunnel_cost": 529.648,
-    "land_compensation_cost": 0.0,
-    "land_compensation": {
-      "total_land_compensation": 0.0,
-      "factor": 1.5,
-      "road_width_m": 20.0,
-      "parcel_count": 0,
-      "official_count": 0,
-      "estimated_count": 0,
-      "source_counts": {},
-      "items": [],
-      "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
-      ],
-      "region_filter": {
-        "enabled": true,
-        "selected_regions": [
-          "강원특별자치도"
-        ],
-        "buffer_km": 10.0
-      }
-    },
-    "total_direct_cost": 1565.752,
-    "surface_road_screen_cost": 1245.22,
-    "new_road_screen_cost": 1245.22,
-    "connector_screen_cost": 49.91,
-    "tunnel_screen_cost": 715.024,
-    "total_screen_cost": 2010.154,
-    "cost_assumptions": {
-      "unit": "eok_krw",
-      "road_unit_cost_eok_per_km": 184.0,
-      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
-      "f_urban": 1.0,
-      "f_speed": 1.0,
-      "f_ground": 1.3,
-      "f_length": 1.062,
-      "f_aux": 1.05,
-      "road_contingency": 0.25,
-      "tunnel_contingency": 0.35,
-      "land_compensation_unit": "eok_krw"
-    }
-  },
-  {
-    "route_id": "R002-T",
-    "existing_road_length_km": 3.907,
-    "connector_length_km": 0.217,
-    "new_surface_road_length_km": 6.621,
-    "surface_road_length_km": 6.621,
-    "tunnel_length_km": 3.121,
-    "surface_road_cost": 1218.264,
-    "new_road_cost": 1218.264,
-    "connector_cost": 39.928,
-    "tunnel_cost": 630.687,
-    "land_compensation_cost": 0.0,
-    "land_compensation": {
-      "total_land_compensation": 0.0,
-      "factor": 1.5,
-      "road_width_m": 20.0,
-      "parcel_count": 0,
-      "official_count": 0,
-      "estimated_count": 0,
-      "source_counts": {},
-      "items": [],
-      "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
-      ],
-      "region_filter": {
-        "enabled": true,
-        "selected_regions": [
-          "강원특별자치도"
-        ],
-        "buffer_km": 10.0
-      }
-    },
-    "total_direct_cost": 1888.879,
-    "surface_road_screen_cost": 1522.83,
-    "new_road_screen_cost": 1522.83,
-    "connector_screen_cost": 49.91,
-    "tunnel_screen_cost": 851.427,
-    "total_screen_cost": 2424.167,
-    "cost_assumptions": {
-      "unit": "eok_krw",
-      "road_unit_cost_eok_per_km": 184.0,
-      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
-      "f_urban": 1.0,
-      "f_speed": 1.0,
-      "f_ground": 1.3,
-      "f_length": 1.062,
-      "f_aux": 1.05,
-      "road_contingency": 0.25,
-      "tunnel_contingency": 0.35,
-      "land_compensation_unit": "eok_krw"
-    }
-  },
-  {
-    "route_id": "R003-B",
-    "existing_road_length_km": 10.131,
-    "connector_length_km": 0.663,
-    "new_surface_road_length_km": 0.0,
-    "surface_road_length_km": 0.0,
-    "tunnel_length_km": 0.0,
-    "surface_road_cost": 0.0,
-    "new_road_cost": 0.0,
-    "connector_cost": 121.992,
+    "existing_road_length_km": 62.52,
+    "connector_length_km": 1.598,
+    "new_surface_road_length_km": 48.841,
+    "surface_road_length_km": 48.841,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 8986.744,
+    "new_road_cost": 8986.744,
+    "connector_cost": 294.032,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -496,15 +392,67 @@
         "selected_regions": [
           "강원특별자치도"
         ],
-        "buffer_km": 10.0
+        "buffer_km": 0.0
       }
     },
-    "total_direct_cost": 121.992,
+    "total_direct_cost": 9280.776,
+    "surface_road_screen_cost": 11233.43,
+    "new_road_screen_cost": 11233.43,
+    "connector_screen_cost": 367.54,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 11600.97,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R003-B",
+    "existing_road_length_km": 105.446,
+    "connector_length_km": 1.641,
+    "new_surface_road_length_km": 0.0,
+    "surface_road_length_km": 0.0,
+    "tunnel_length_km": 0.0,
+    "surface_road_cost": 0.0,
+    "new_road_cost": 0.0,
+    "connector_cost": 301.944,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "items": [],
+      "warnings": [
+        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "강원특별자치도"
+        ],
+        "buffer_km": 0.0
+      }
+    },
+    "total_direct_cost": 301.944,
     "surface_road_screen_cost": 0.0,
     "new_road_screen_cost": 0.0,
-    "connector_screen_cost": 152.49,
+    "connector_screen_cost": 377.43,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 152.49,
+    "total_screen_cost": 377.43,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -521,13 +469,13 @@
   },
   {
     "route_id": "R003-D",
-    "existing_road_length_km": 0.0,
+    "existing_road_length_km": 3.966,
     "connector_length_km": 0.0,
-    "new_surface_road_length_km": 10.328,
-    "surface_road_length_km": 10.328,
+    "new_surface_road_length_km": 84.885,
+    "surface_road_length_km": 84.885,
     "tunnel_length_km": 0,
-    "surface_road_cost": 1900.352,
-    "new_road_cost": 1900.352,
+    "surface_road_cost": 15618.84,
+    "new_road_cost": 15618.84,
     "connector_cost": 0.0,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
@@ -548,67 +496,15 @@
         "selected_regions": [
           "강원특별자치도"
         ],
-        "buffer_km": 10.0
+        "buffer_km": 0.0
       }
     },
-    "total_direct_cost": 1900.352,
-    "surface_road_screen_cost": 2375.44,
-    "new_road_screen_cost": 2375.44,
+    "total_direct_cost": 15618.84,
+    "surface_road_screen_cost": 19523.55,
+    "new_road_screen_cost": 19523.55,
     "connector_screen_cost": 0.0,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 2375.44,
-    "cost_assumptions": {
-      "unit": "eok_krw",
-      "road_unit_cost_eok_per_km": 184.0,
-      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
-      "f_urban": 1.0,
-      "f_speed": 1.0,
-      "f_ground": 1.3,
-      "f_length": 0.994,
-      "f_aux": 1.05,
-      "road_contingency": 0.25,
-      "tunnel_contingency": 0.35,
-      "land_compensation_unit": "eok_krw"
-    }
-  },
-  {
-    "route_id": "R003-H",
-    "existing_road_length_km": 5.945,
-    "connector_length_km": 0.351,
-    "new_surface_road_length_km": 4.536,
-    "surface_road_length_km": 4.536,
-    "tunnel_length_km": 0,
-    "surface_road_cost": 834.624,
-    "new_road_cost": 834.624,
-    "connector_cost": 64.584,
-    "tunnel_cost": 0.0,
-    "land_compensation_cost": 0.0,
-    "land_compensation": {
-      "total_land_compensation": 0.0,
-      "factor": 1.5,
-      "road_width_m": 20.0,
-      "parcel_count": 0,
-      "official_count": 0,
-      "estimated_count": 0,
-      "source_counts": {},
-      "items": [],
-      "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
-      ],
-      "region_filter": {
-        "enabled": true,
-        "selected_regions": [
-          "강원특별자치도"
-        ],
-        "buffer_km": 10.0
-      }
-    },
-    "total_direct_cost": 899.208,
-    "surface_road_screen_cost": 1043.28,
-    "new_road_screen_cost": 1043.28,
-    "connector_screen_cost": 80.73,
-    "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 1124.01,
+    "total_screen_cost": 19523.55,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -625,14 +521,14 @@
   },
   {
     "route_id": "R003-P",
-    "existing_road_length_km": 6.914,
-    "connector_length_km": 0.351,
-    "new_surface_road_length_km": 3.328,
-    "surface_road_length_km": 3.328,
+    "existing_road_length_km": 56.675,
+    "connector_length_km": 1.642,
+    "new_surface_road_length_km": 42.881,
+    "surface_road_length_km": 42.881,
     "tunnel_length_km": 0,
-    "surface_road_cost": 612.352,
-    "new_road_cost": 612.352,
-    "connector_cost": 64.584,
+    "surface_road_cost": 7890.104,
+    "new_road_cost": 7890.104,
+    "connector_cost": 302.128,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -652,15 +548,15 @@
         "selected_regions": [
           "강원특별자치도"
         ],
-        "buffer_km": 10.0
+        "buffer_km": 0.0
       }
     },
-    "total_direct_cost": 676.936,
-    "surface_road_screen_cost": 765.44,
-    "new_road_screen_cost": 765.44,
-    "connector_screen_cost": 80.73,
+    "total_direct_cost": 8192.232,
+    "surface_road_screen_cost": 9862.63,
+    "new_road_screen_cost": 9862.63,
+    "connector_screen_cost": 377.66,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 846.17,
+    "total_screen_cost": 10240.29,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -669,6 +565,162 @@
       "f_speed": 1.0,
       "f_ground": 1.3,
       "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R004-B",
+    "existing_road_length_km": 162.667,
+    "connector_length_km": 3.379,
+    "new_surface_road_length_km": 0.0,
+    "surface_road_length_km": 0.0,
+    "tunnel_length_km": 0.0,
+    "surface_road_cost": 0.0,
+    "new_road_cost": 0.0,
+    "connector_cost": 621.736,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "items": [],
+      "warnings": [
+        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "강원특별자치도"
+        ],
+        "buffer_km": 0.0
+      }
+    },
+    "total_direct_cost": 621.736,
+    "surface_road_screen_cost": 0.0,
+    "new_road_screen_cost": 0.0,
+    "connector_screen_cost": 777.17,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 777.17,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R004-D",
+    "existing_road_length_km": 0,
+    "connector_length_km": 0.0,
+    "new_surface_road_length_km": 109.183,
+    "surface_road_length_km": 109.183,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 20089.672,
+    "new_road_cost": 20089.672,
+    "connector_cost": 0.0,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "items": [],
+      "warnings": [
+        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "강원특별자치도"
+        ],
+        "buffer_km": 0.0
+      }
+    },
+    "total_direct_cost": 20089.672,
+    "surface_road_screen_cost": 25112.09,
+    "new_road_screen_cost": 25112.09,
+    "connector_screen_cost": 0.0,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 25112.09,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R004-P",
+    "existing_road_length_km": 94.609,
+    "connector_length_km": 3.38,
+    "new_surface_road_length_km": 51.51,
+    "surface_road_length_km": 51.51,
+    "tunnel_length_km": 2.577,
+    "surface_road_cost": 9477.84,
+    "new_road_cost": 9477.84,
+    "connector_cost": 621.92,
+    "tunnel_cost": 520.756,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "items": [],
+      "warnings": [
+        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "강원특별자치도"
+        ],
+        "buffer_km": 0.0
+      }
+    },
+    "total_direct_cost": 10620.516,
+    "surface_road_screen_cost": 11847.3,
+    "new_road_screen_cost": 11847.3,
+    "connector_screen_cost": 777.4,
+    "tunnel_screen_cost": 703.021,
+    "total_screen_cost": 13327.721,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 1.062,
       "f_aux": 1.05,
       "road_contingency": 0.25,
       "tunnel_contingency": 0.35,

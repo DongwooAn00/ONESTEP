@@ -17,7 +17,17 @@ def _route(route_id: str = "R001-D", tunnel_length: float = 2.0) -> dict:
         "new_surface_road_length_km": 8.5 if tunnel_length else 10.5,
         "tunnel_length_km": tunnel_length,
         "construction_cost": 3200.0,
+        "estimated_flow": 10000.0,
+        "diversion_rate": 0.42,
+        "diverted_flow": 4200.0,
+        "distance_saving_ratio": 0.12,
+        "time_saving_hours": 0.125,
+        "time_saving_ratio": 0.18,
+        "annual_time_benefit": 240.0,
+        "annual_distance_benefit": 40.0,
+        "annual_benefit_before_diversion": 666.667,
         "annual_benefit": 280.0,
+        "total_benefit_before_diversion": 10238.0,
         "total_benefit": 4300.0,
         "benefit_cost_ratio": 1.34,
         "net_benefit": 1100.0,
@@ -88,6 +98,10 @@ def test_template_report_is_generated_from_candidate_values():
     assert "B/C" in report.summary
     assert report.metrics.tunnel_length_km == 2.0
     assert report.metrics.total_project_cost > report.metrics.construction_cost
+    assert report.metrics.diversion_rate == 0.42
+    assert report.metrics.diverted_flow == 4200.0
+    assert "전환률" in report.benefit_analysis
+    assert "미반영 연간 편익" in report.benefit_analysis
     assert "## 6. 종합 검토 의견" in report.markdown
 
 

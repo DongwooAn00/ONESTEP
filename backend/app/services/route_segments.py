@@ -86,9 +86,16 @@ def _local_relief_m(cells: list[CostCell], index: int, window: int = 3) -> float
 
 def _initial_type(cells: list[CostCell], index: int, start: CostCell, end: CostCell) -> tuple[str, str | None]:
     river_rank = start.river_rank or end.river_rank
+    road_distances = (start.road_distance_m, end.road_distance_m)
+    if all(
+        distance is not None
+        and distance <= config.EXISTING_ROAD_CLASSIFICATION_DISTANCE_M
+        for distance in road_distances
+    ):
+        return "existing_road", river_rank
     max_slope = max(start.slope_degrees, end.slope_degrees)
     high_relief = _local_relief_m(cells, index) >= 80 and max(start.cost, end.cost) >= 5.0
-    if max_slope >= 25 or max_slope >= 20 or high_relief:
+    if max_slope >= 25 or high_relief:
         return "tunnel", None
     return "new_surface_road", river_rank
 
@@ -121,6 +128,21 @@ def _atom_with_decision(cells: list[CostCell], index: int, start: CostCell, end:
         _avg_optional([start.local_relief_m, end.local_relief_m]) or 0.0,
     )
     road_grade = _road_grade_percent(start, end, length_km)
+    if original_type == "existing_road":
+        return _AtomicSegment(
+            segment_type="existing_road",
+            start=start,
+            end=end,
+            length_km=length_km,
+            average_slope=average_slope,
+            max_slope=max_slope,
+            river_rank=river_rank,
+            original_segment_type="existing_road",
+            decision_status="existing_asset",
+            road_grade_percent=road_grade,
+            slope_deg=max_slope,
+            risk_reasons=(),
+        )
     overburden = _avg_optional([start.overburden_m, end.overburden_m])
     estimated_rock = start.estimated_rock_class or end.estimated_rock_class
     rock_class = start.rock_class or end.rock_class or estimated_rock
@@ -157,12 +179,13 @@ def _atom_with_decision(cells: list[CostCell], index: int, start: CostCell, end:
     for cell in (start, end):
         if cell.risk_reasons:
             risk_reasons.extend(cell.risk_reasons)
+    tunnel_is_justified = (
+        original_type == "tunnel"
+        and (road_grade or 0.0) >= config.MIN_TUNNEL_ROAD_GRADE_PERCENT
+        and tunnel_cost <= surface_cost * config.TUNNEL_COST_REASONABLE_RATIO
+    )
     return _AtomicSegment(
-        segment_type=(
-            "tunnel"
-            if decision.final_segment_type == "tunnel"
-            else "new_surface_road"
-        ),
+        segment_type="tunnel" if decision.final_segment_type == "tunnel" and tunnel_is_justified else "new_surface_road",
         start=start,
         end=end,
         length_km=length_km,
@@ -186,7 +209,11 @@ def _atom_with_decision(cells: list[CostCell], index: int, start: CostCell, end:
         boundary_dist_m=boundary_dist,
         estimated_surface_cost_eok=decision.estimated_surface_cost_eok,
         estimated_tunnel_cost_eok=decision.estimated_tunnel_cost_eok,
-        decision_reason=decision.decision_reason,
+        decision_reason=(
+            decision.decision_reason
+            if decision.final_segment_type != "tunnel" or tunnel_is_justified
+            else "surface_preferred_tunnel_conditions_not_jointly_satisfied"
+        ),
         risk_reasons=tuple(dict.fromkeys(risk_reasons)),
     )
 
@@ -217,7 +244,7 @@ def _downgrade_short_tunnels(atoms: list[_AtomicSegment]) -> list[_AtomicSegment
         while end < len(result) and result[end].segment_type == "tunnel":
             length_km += result[end].length_km
             end += 1
-        if length_km < 0.3:
+        if length_km < config.MIN_TUNNEL_CONTINUOUS_LENGTH_KM:
             for cursor in range(index, end):
                 atom = result[cursor]
                 result[cursor] = replace(atom, segment_type="new_surface_road")
@@ -235,6 +262,8 @@ def _merge_tunnel_gaps(atoms: list[_AtomicSegment]) -> list[_AtomicSegment]:
         gap_start = index
         gap_length_km = 0.0
         while index < len(result) and result[index].segment_type != "tunnel":
+            if result[index].segment_type == "existing_road":
+                gap_length_km = float("inf")
             gap_length_km += result[index].length_km
             index += 1
         has_tunnel_before = gap_start > 0 and result[gap_start - 1].segment_type == "tunnel"
@@ -292,6 +321,7 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
     atoms = _merge_tunnel_gaps(_downgrade_short_tunnels(_atomic_segments(cells)))
     if not atoms:
         return {
+            "existing_road_length_km": 0.0,
             "new_surface_road_length_km": 0.0,
             "tunnel_length_km": 0.0,
             "tunnel_segment_count": 0,
@@ -364,6 +394,10 @@ def classify_route_segments(route_id: str, cells: list[CostCell]) -> dict:
         )
 
     return {
+        "existing_road_length_km": round(
+            sum(item.segment_length_km for item in details if item.segment_type == "existing_road"),
+            3,
+        ),
         "new_surface_road_length_km": round(
             sum(item.segment_length_km for item in details if item.segment_type == "new_surface_road"),
             3,

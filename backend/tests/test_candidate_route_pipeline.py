@@ -130,7 +130,7 @@ def test_land_compensation_is_added_after_route_generation(monkeypatch):
 
     monkeypatch.setattr(
         candidate_route_pipeline,
-        "_project_route_geometry",
+        "_project_new_build_geometry",
         lambda route_geometry: object(),
     )
     monkeypatch.setattr(
@@ -144,6 +144,14 @@ def test_land_compensation_is_added_after_route_generation(monkeypatch):
             "official_count": 1,
             "estimated_count": 0,
             "source_counts": {"official": 1},
+            "land_compensation_total": 100_000_000.0,
+            "land_compensation_by_land_type": {
+                "forest": 100_000_000.0,
+                "farmland": 0.0,
+                "residential": 0.0,
+                "commercial_industrial": 0.0,
+                "unknown": 0.0,
+            },
             "items": [],
             "warnings": [],
         },
@@ -166,6 +174,11 @@ def test_land_compensation_is_added_after_route_generation(monkeypatch):
         connector_length_km=cost["connector_length_km"],
     )
     assert cost["land_compensation_cost"] == 1.0
+    assert result["routes"][0]["land_compensation_total"] == 100_000_000.0
+    assert (
+        result["routes"][0]["land_compensation_by_land_type"]["forest"]
+        == 100_000_000.0
+    )
     assert cost["total_direct_cost"] == construction_only["total_direct_cost"] + 1.0
     assert cost["total_screen_cost"] == construction_only["total_screen_cost"] + 1.0
 

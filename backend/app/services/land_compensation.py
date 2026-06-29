@@ -12,6 +12,25 @@ DEFAULT_PRICE_PER_M2 = 100_000.0
 LAND_COMPENSATION_FACTOR = 1.5
 DEFAULT_K = 5
 DEFAULT_MAX_DISTANCE_M = 1_000.0
+LAND_COMPENSATION_MULTIPLIERS = {
+    "forest": 1.2,
+    "farmland": 1.4,
+    "residential": 1.8,
+    "commercial_industrial": 2.0,
+    "unknown": 1.5,
+}
+LAND_CATEGORY_MAPPING = {
+    "임야": "forest",
+    "전": "farmland",
+    "답": "farmland",
+    "과수원": "farmland",
+    "대": "residential",
+    "대지": "residential",
+    "공장용지": "commercial_industrial",
+    "창고용지": "commercial_industrial",
+    "주차장": "commercial_industrial",
+    "주유소용지": "commercial_industrial",
+}
 
 
 @dataclass
@@ -24,6 +43,7 @@ class Parcel:
     land_type: str
     geometry: Any
     official_price_per_m2: float | None = None
+    land_category_raw: str | None = None
 
 
 ParcelLike = Parcel | Mapping[str, Any]
@@ -116,6 +136,44 @@ def _valid_price(value: Any) -> float | None:
     if not math.isfinite(price) or price <= 0:
         return None
     return price
+
+
+def classify_land_type(value: Any) -> str:
+    raw = str(value or "").strip()
+    if raw in LAND_COMPENSATION_MULTIPLIERS:
+        return raw
+    if raw in LAND_CATEGORY_MAPPING:
+        return LAND_CATEGORY_MAPPING[raw]
+    normalized = raw.replace(" ", "")
+    if normalized in LAND_CATEGORY_MAPPING:
+        return LAND_CATEGORY_MAPPING[normalized]
+    if "임야" in normalized or "산림" in normalized:
+        return "forest"
+    if normalized in {"전", "답", "과수원"} or "농지" in normalized:
+        return "farmland"
+    if normalized in {"대", "대지"} or "주거" in normalized:
+        return "residential"
+    if any(
+        token in normalized
+        for token in ("상업", "공업", "공장", "창고", "주차장", "주유소")
+    ):
+        return "commercial_industrial"
+    return "unknown"
+
+
+def _land_category_raw(parcel: ParcelLike) -> str:
+    for field in (
+        "land_category_raw",
+        "land_category",
+        "지목",
+        "land_use",
+        "use_region",
+        "land_type",
+    ):
+        value = _value(parcel, field)
+        if value not in (None, ""):
+            return str(value).strip()
+    return ""
 
 
 def _same_parcel(left: ParcelLike, right: ParcelLike) -> bool:
@@ -317,6 +375,10 @@ def _empty_result(
         "official_count": 0,
         "estimated_count": 0,
         "source_counts": {},
+        "land_compensation_total": 0.0,
+        "land_compensation_by_land_type": {
+            land_type: 0.0 for land_type in LAND_COMPENSATION_MULTIPLIERS
+        },
         "items": [],
         "warnings": [warning] if warning else [],
     }
@@ -372,6 +434,9 @@ def estimate_land_compensation(
     items: list[dict[str, Any]] = []
     warnings: list[str] = []
     source_counts: dict[str, int] = {}
+    compensation_by_land_type = {
+        land_type: 0.0 for land_type in LAND_COMPENSATION_MULTIPLIERS
+    }
     for parcel in parcels:
         pnu = str(_value(parcel, "pnu") or "")
         try:
@@ -409,10 +474,24 @@ def estimate_land_compensation(
                 metadata = {"source": "default"}
                 warnings.append(f"{pnu or 'PNU 미상'}: 가격 결정 실패 ({error})")
 
-        land_cost = area_m2 * price * factor
+        land_category_raw = _land_category_raw(parcel)
+        land_type = classify_land_type(land_category_raw)
+        compensation_multiplier = (
+            LAND_COMPENSATION_MULTIPLIERS[land_type]
+            if land_type != "unknown"
+            else factor
+        )
+        land_cost = area_m2 * price * compensation_multiplier
         source_counts[source] = source_counts.get(source, 0) + 1
+        compensation_by_land_type[land_type] += land_cost
         item = {
             "pnu": pnu,
+            "land_category_raw": land_category_raw,
+            "land_type": land_type,
+            "acquired_area_m2": round(area_m2, 3),
+            "estimated_land_price": round(price, 3),
+            "compensation_multiplier": compensation_multiplier,
+            "estimated_compensation": round(land_cost, 3),
             "area_m2": round(area_m2, 3),
             "price_per_m2": round(price, 3),
             "price_source": source,
@@ -432,6 +511,11 @@ def estimate_land_compensation(
         "official_count": official_count,
         "estimated_count": len(items) - official_count,
         "source_counts": source_counts,
+        "land_compensation_total": round(total, 3),
+        "land_compensation_by_land_type": {
+            land_type: round(value, 3)
+            for land_type, value in compensation_by_land_type.items()
+        },
         "items": items,
         "warnings": warnings,
     }

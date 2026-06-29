@@ -92,16 +92,16 @@ def _transform_pyproj(transform, x: float, y: float) -> ProjectedPoint:
 
 def to_road_point(lat: float, lon: float) -> ProjectedPoint:
     try:
-        return _transform(_spatial_refs()["wgs84_to_road"], lon, lat)
-    except ImportError:
         return _transform_pyproj(_pyproj_transformers()["wgs84_to_road"], lon, lat)
+    except ImportError:
+        return _transform(_spatial_refs()["wgs84_to_road"], lon, lat)
 
 
 def to_coordinate(x: float, y: float) -> Coordinate:
     try:
-        point = _transform(_spatial_refs()["road_to_wgs84"], x, y)
-    except ImportError:
         point = _transform_pyproj(_pyproj_transformers()["road_to_wgs84"], x, y)
+    except ImportError:
+        point = _transform(_spatial_refs()["road_to_wgs84"], x, y)
     return Coordinate(lat=point.y, lon=point.x)
 
 
@@ -138,6 +138,69 @@ def nearest_road_node(lat: float, lon: float) -> RoadAccessPoint:
         road_y=float(y),
         coordinate=to_coordinate(float(x), float(y)),
     )
+
+
+def snap_geometry_to_road_centerline(
+    geometry: list[dict[str, float]],
+    *,
+    max_distance_m: float,
+) -> tuple[list[dict[str, float]], list[bool]]:
+    """Snap WGS84 points to exact road centerlines in one spatial query."""
+    if not geometry:
+        return [], []
+    projected = [
+        to_road_point(
+            float(point["lat"]),
+            float(point.get("lon", point.get("lng", point.get("longitude")))),
+        )
+        for point in geometry
+    ]
+    with connect() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                WITH input_points AS (
+                    SELECT
+                        ordinality AS point_index,
+                        ST_SetSRID(ST_MakePoint(x, y), 100001) AS geom
+                    FROM unnest(
+                        %s::double precision[],
+                        %s::double precision[]
+                    ) WITH ORDINALITY AS points(x, y, ordinality)
+                )
+                SELECT
+                    input_points.point_index,
+                    ST_X(nearest.snapped_point) AS snapped_x,
+                    ST_Y(nearest.snapped_point) AS snapped_y
+                FROM input_points
+                LEFT JOIN LATERAL (
+                    SELECT ST_ClosestPoint(road_links.geom, input_points.geom) AS snapped_point
+                    FROM road_links
+                    WHERE ST_DWithin(road_links.geom, input_points.geom, %s)
+                    ORDER BY road_links.geom <-> input_points.geom
+                    LIMIT 1
+                ) AS nearest ON TRUE
+                ORDER BY input_points.point_index;
+                """,
+                (
+                    [point.x for point in projected],
+                    [point.y for point in projected],
+                    max_distance_m,
+                ),
+            )
+            rows = cursor.fetchall()
+
+    snapped_geometry: list[dict[str, float]] = []
+    snap_mask: list[bool] = []
+    for original, row in zip(geometry, rows):
+        if row[1] is None or row[2] is None:
+            snapped_geometry.append(dict(original))
+            snap_mask.append(False)
+            continue
+        coordinate = to_coordinate(float(row[1]), float(row[2]))
+        snapped_geometry.append({"lat": coordinate.lat, "lon": coordinate.lon})
+        snap_mask.append(True)
+    return snapped_geometry, snap_mask
 
 
 def nearby_road_links(lat: float, lon: float, radius_m: float = 2000, limit: int = 100) -> list[RoadLink]:

@@ -85,10 +85,11 @@ def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
     successful = [
         row
         for row in route_rows
-        if row["status"] == "success" and row.get("route_type") != "existing_baseline"
+        if row["status"] == "success"
+        and row.get("route_type") != "existing_baseline"
     ]
     benefit_values = [
-        row.get("total_benefit", row["estimated_flow"] * row.get("distance_saving_km", 0.0))
+        row.get("total_benefit", 0.0)
         for row in successful
     ]
     cost_values = [row["total_screen_cost"] for row in successful]
@@ -108,7 +109,7 @@ def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
         assumed_existing_length = _assumed_existing_route_length_km(
             straight_distance_km=row.get("straight_distance_km", 0.0),
         )
-        benefit_proxy = row["estimated_flow"] * row["distance_saving_km"]
+        benefit_proxy = row.get("diverted_flow", 0.0) * row["distance_saving_km"]
         cost_per_flow_saving = row["total_screen_cost"] / benefit_proxy if benefit_proxy > 0 else None
         ranked.append(
             {
@@ -118,17 +119,30 @@ def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
                 "from_node_id": row["from_node_id"],
                 "to_node_id": row["to_node_id"],
                 "estimated_flow": row["estimated_flow"],
+                "saving_score": row.get("saving_score", 0.0),
+                "diversion_rate": row.get("diversion_rate", 0.0),
+                "diverted_flow": row.get("diverted_flow", 0.0),
                 "distance_saving_km": round(row["distance_saving_km"], 3),
                 "total_screen_cost": round(row["total_screen_cost"], 3),
                 "economic_score": score,
                 "candidate_score": score,
                 "construction_cost": row.get("construction_cost", row["total_screen_cost"]),
                 "annual_benefit": row.get("annual_benefit", 0.0),
+                "annual_time_benefit": row.get("annual_time_benefit", 0.0),
+                "annual_distance_benefit": row.get("annual_distance_benefit", 0.0),
+                "annual_benefit_before_diversion": row.get("annual_benefit_before_diversion", 0.0),
                 "total_benefit": row.get("total_benefit", 0.0),
+                "total_benefit_before_diversion": row.get("total_benefit_before_diversion", 0.0),
                 "benefit_cost_ratio": row.get("benefit_cost_ratio", 0.0),
+                "bc_ratio": row.get("bc_ratio", row.get("benefit_cost_ratio", 0.0)),
                 "net_benefit": row.get("net_benefit", 0.0),
                 "time_saving_minutes": row.get("time_saving_minutes", 0.0),
                 "new_segment_ratio": row.get("new_segment_ratio", 0.0),
+                "existing_road_ratio": row.get("existing_road_ratio", 0.0),
+                "new_construction_ratio": row.get("new_construction_ratio", 0.0),
+                "access_road_length_km": row.get("connector_length_km", 0.0),
+                "distance_saving_ratio": row.get("distance_saving_ratio", 0.0),
+                "time_saving_ratio": row.get("time_saving_ratio", 0.0),
                 **tunnel_summary,
                 "summary": {
                     "label": "MVP 예비 경제성 점수",
@@ -144,6 +158,7 @@ def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
                     "existing_road_length_km": row.get("existing_road_length_km", 0.0),
                     "new_surface_road_length_km": row.get("new_surface_road_length_km", row["surface_road_length_km"]),
                     "connector_length_km": row.get("connector_length_km", 0.0),
+                    "access_road_length_km": row.get("connector_length_km", 0.0),
                     "tunnel_length_km": row["tunnel_length_km"],
                     "existing_road_access_length_km": row.get("existing_road_access_length_km", 0.0),
                     "existing_road_access_percent": row.get("existing_road_access_percent", 0.0),
@@ -151,11 +166,25 @@ def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
                     "river_crossing_count": row.get("river_crossing_count", 0),
                     "failed_reason": row.get("failed_reason"),
                     "annual_benefit": row.get("annual_benefit", 0.0),
+                    "annual_time_benefit": row.get("annual_time_benefit", 0.0),
+                    "annual_distance_benefit": row.get("annual_distance_benefit", 0.0),
+                    "annual_benefit_before_diversion": row.get("annual_benefit_before_diversion", 0.0),
                     "total_benefit": row.get("total_benefit", 0.0),
+                    "total_benefit_before_diversion": row.get("total_benefit_before_diversion", 0.0),
                     "benefit_cost_ratio": row.get("benefit_cost_ratio", 0.0),
+                    "bc_ratio": row.get("bc_ratio", row.get("benefit_cost_ratio", 0.0)),
                     "net_benefit": row.get("net_benefit", 0.0),
                     "time_saving_minutes": row.get("time_saving_minutes", 0.0),
+                    "time_saving_hours": row.get("time_saving_hours", 0.0),
+                    "estimated_flow": row.get("estimated_flow", 0.0),
+                    "saving_score": row.get("saving_score", 0.0),
+                    "diversion_rate": row.get("diversion_rate", 0.0),
+                    "diverted_flow": row.get("diverted_flow", 0.0),
                     "new_segment_ratio": row.get("new_segment_ratio", 0.0),
+                    "existing_road_ratio": row.get("existing_road_ratio", 0.0),
+                    "new_construction_ratio": row.get("new_construction_ratio", 0.0),
+                    "distance_saving_ratio": row.get("distance_saving_ratio", 0.0),
+                    "time_saving_ratio": row.get("time_saving_ratio", 0.0),
                     "candidate_score": score,
                     "explanation": row.get("explanation", []),
                     **tunnel_summary,
@@ -163,7 +192,7 @@ def rank_candidate_routes(route_rows: list[dict]) -> list[dict]:
             }
         )
 
-    ranked.sort(key=lambda item: (item["economic_score"], item["estimated_flow"]), reverse=True)
+    ranked.sort(key=lambda item: (item["economic_score"], item["diverted_flow"]), reverse=True)
     for index, row in enumerate(ranked, start=1):
         row["rank"] = index
     return ranked

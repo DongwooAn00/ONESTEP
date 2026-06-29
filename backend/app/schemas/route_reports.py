@@ -27,12 +27,22 @@ class RouteReportMetrics(BaseModel):
     construction_cost: float | None = None
     total_project_cost: float | None = None
     annual_benefit: float | None = None
+    annual_time_benefit: float | None = None
+    annual_distance_benefit: float | None = None
+    annual_benefit_before_diversion: float | None = None
     benefit: float | None = None
+    benefit_before_diversion: float | None = None
     benefit_cost_ratio: float | None = None
     net_present_value: float | None = None
     economic_score: float | None = None
     distance_saving_km: float | None = None
+    distance_saving_ratio: float | None = None
+    time_saving_hours: float | None = None
     time_saving_minutes: float | None = None
+    time_saving_ratio: float | None = None
+    estimated_flow: float | None = None
+    diversion_rate: float | None = None
+    diverted_flow: float | None = None
     average_slope: float | None = None
     max_slope: float | None = None
 

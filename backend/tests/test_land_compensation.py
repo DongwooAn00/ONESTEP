@@ -9,6 +9,7 @@ from app.services.land_compensation import (
     DEFAULT_PRICE_PER_M2,
     InMemoryParcelRepository,
     Parcel,
+    classify_land_type,
     estimate_land_compensation,
     estimate_missing_land_price_knn,
     resolve_land_price,
@@ -110,7 +111,7 @@ def test_resolve_land_price_uses_default_when_no_candidates_exist() -> None:
 
 
 def test_land_compensation_uses_area_price_and_factor() -> None:
-    parcel = _parcel("target", price=85_000, area=123.4)
+    parcel = _parcel("target", land_type="도로", price=85_000, area=123.4)
     repository = InMemoryParcelRepository([parcel])
 
     result = estimate_land_compensation(
@@ -124,6 +125,46 @@ def test_land_compensation_uses_area_price_and_factor() -> None:
     assert result["items"][0]["area_m2"] == 123.4
     assert result["items"][0]["land_cost"] == 123.4 * 85_000 * 1.5
     assert result["total_land_compensation"] == 123.4 * 85_000 * 1.5
+
+
+def test_land_category_multipliers_and_route_totals() -> None:
+    parcels = [
+        _parcel("forest", land_type="임야", price=100_000, area=10),
+        _parcel("farm", land_type="전", price=100_000, area=10),
+        _parcel("home", land_type="대", price=100_000, area=10),
+        _parcel("factory", land_type="공장용지", price=100_000, area=10),
+        _parcel("unknown", land_type="도로", price=100_000, area=10),
+    ]
+
+    result = estimate_land_compensation(
+        RouteGeometry(),
+        road_width_m=20,
+        repository=InMemoryParcelRepository(parcels),
+    )
+
+    assert classify_land_type("임야") == "forest"
+    assert classify_land_type("답") == "farmland"
+    assert classify_land_type("대지") == "residential"
+    assert classify_land_type("창고용지") == "commercial_industrial"
+    assert classify_land_type("도로") == "unknown"
+    expected = {
+        "forest": 1_200_000.0,
+        "farmland": 1_400_000.0,
+        "residential": 1_800_000.0,
+        "commercial_industrial": 2_000_000.0,
+        "unknown": 1_500_000.0,
+    }
+    assert result["land_compensation_by_land_type"] == expected
+    assert result["land_compensation_total"] == sum(expected.values())
+    assert {
+        item["pnu"]: item["compensation_multiplier"] for item in result["items"]
+    } == {
+        "forest": 1.2,
+        "farm": 1.4,
+        "home": 1.8,
+        "factory": 2.0,
+        "unknown": 1.5,
+    }
 
 
 def test_official_price_skips_reference_parcel_lookup() -> None:

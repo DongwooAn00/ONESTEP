@@ -40,11 +40,23 @@ class CandidateRoute(BaseModel):
     connector_length_km: float = 0.0
     new_surface_road_length_km: float = 0.0
     tunnel_length_km: float = 0.0
+    estimated_flow: float = 0.0
+    diversion_rate: float = 0.0
+    diverted_flow: float = 0.0
     construction_cost: float = 0.0
+    land_compensation_total: float = 0.0
+    land_compensation_by_land_type: dict[str, float] = Field(default_factory=dict)
+    annual_time_benefit: float = 0.0
+    annual_distance_benefit: float = 0.0
     annual_benefit: float = 0.0
     total_benefit: float = 0.0
     benefit_cost_ratio: float = 0.0
+    bc_ratio: float = 0.0
+    net_benefit: float = 0.0
     distance_saving_km: float = 0.0
+    distance_saving_ratio: float = 0.0
+    time_saving_hours: float = 0.0
+    time_saving_ratio: float = 0.0
     time_saving_minutes: float = 0.0
     candidate_score: float = 0.0
     explanation: list[str] = Field(default_factory=list)
