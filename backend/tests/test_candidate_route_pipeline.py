@@ -364,3 +364,88 @@ def test_population_fallback_penalizes_urban_cells(monkeypatch):
     assert urban.cost == cost_grid.config.URBAN_POPULATION_HIGH_MULTIPLIER
     assert rural.builtup_area is False
     assert rural.cost == 1.0
+
+
+def test_geology_layer_populates_cost_cells(monkeypatch):
+    monkeypatch.setattr(
+        cost_grid,
+        "_find_existing_table",
+        lambda names: {
+            ("geology_litho",): "geology_litho",
+            ("geology_faults",): "geology_faults",
+            ("geology_boundaries",): "geology_boundaries",
+        }.get(tuple(names)),
+    )
+    monkeypatch.setattr(
+        cost_grid,
+        "_table_columns",
+        lambda table_name: frozenset({"refrock"}) if table_name == "geology_litho" else frozenset(),
+    )
+
+    class FakeCursor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def execute(self, *args, **kwargs):
+            return None
+
+        def fetchall(self):
+            return [
+                (1, "화강암", 40.0, 120.0),
+                (2, "알 수 없는 암종", None, None),
+            ]
+
+    class FakeConnection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, traceback):
+            return False
+
+        def cursor(self):
+            return FakeCursor()
+
+    monkeypatch.setattr(cost_grid, "connect", lambda: FakeConnection())
+
+    cells = [
+        cost_grid.CostCell(
+            row=0,
+            col=0,
+            x=0.0,
+            y=0.0,
+            lon=127.0,
+            lat=37.0,
+            elevation_m=100.0,
+            slope_degrees=10.0,
+        ),
+        cost_grid.CostCell(
+            row=0,
+            col=1,
+            x=500.0,
+            y=0.0,
+            lon=127.01,
+            lat=37.0,
+            elevation_m=105.0,
+            slope_degrees=5.0,
+        ),
+    ]
+    grid = cost_grid.CostGrid(
+        cells=[cells],
+        cell_size_m=500.0,
+        origin_x=0.0,
+        origin_y=0.0,
+        warnings=[],
+    )
+
+    cost_grid._apply_optional_geology(grid)
+
+    assert cells[0].estimated_rock_class in {"II", "III", "IV", "V"}
+    assert cells[0].rock_class == cells[0].estimated_rock_class
+    assert cells[0].fault_dist_m == 40.0
+    assert cells[0].boundary_dist_m == 120.0
+    assert cells[0].rock_ground_factor is not None
+    assert cells[1].estimated_rock_class == "III"
+    assert "unknown_refrock_default_class_III" in cells[1].risk_reasons

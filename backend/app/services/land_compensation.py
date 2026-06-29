@@ -11,7 +11,14 @@ from typing import Any, Mapping, Protocol, Sequence
 DEFAULT_PRICE_PER_M2 = 100_000.0
 LAND_COMPENSATION_FACTOR = 1.5
 DEFAULT_K = 5
-DEFAULT_MAX_DISTANCE_M = 1_000.0
+DEFAULT_KNN_RADIUS_M = 2_000.0
+FALLBACK_KNN_RADIUS_M = 5_000.0
+DEFAULT_MAX_DISTANCE_M = DEFAULT_KNN_RADIUS_M
+LAND_COMPENSATION_EXPLANATION = (
+    "공시지가가 존재하는 필지는 PNU 기준 개별공시지가를 사용하고, 공시지가가 없는 필지는 주변 필지의 "
+    "공시지가를 KNN 방식으로 보간하여 추정했습니다. 본 토지보상비는 추정값이며, 실제 보상액은 "
+    "감정평가 결과와 법적 보상 절차에 따라 달라질 수 있습니다."
+)
 LAND_COMPENSATION_MULTIPLIERS = {
     "forest": 1.2,
     "farmland": 1.4,
@@ -31,6 +38,15 @@ LAND_CATEGORY_MAPPING = {
     "주차장": "commercial_industrial",
     "주유소용지": "commercial_industrial",
 }
+PRICE_SOURCE_KEYS = (
+    "official",
+    "knn_2km",
+    "knn_5km",
+    "district_avg",
+    "province_avg",
+    "global_median",
+    "missing",
+)
 
 
 @dataclass
@@ -60,7 +76,7 @@ class ParcelRepository(Protocol):
         """노선 도로부지와 교차하는 필지를 반환한다."""
 
     def get_reference_parcels(self, target_parcel: ParcelLike) -> list[ParcelLike]:
-        """중앙값 및 KNN 계산에 사용할 공식가격 보유 후보 필지를 반환한다."""
+        """가격 보간에 사용할 공식지가 보유 후보 필지를 반환한다."""
 
 
 class NullParcelRepository:
@@ -113,6 +129,18 @@ class InMemoryParcelRepository:
     def get_reference_parcels(self, target_parcel: ParcelLike) -> list[ParcelLike]:
         """등록된 가격 참조 필지 전체를 반환한다."""
         return list(self.reference_parcels)
+
+    def get_reference_parcels_around_route(
+        self,
+        route_geom: Any,
+        search_radius_m: float,
+    ) -> list[ParcelLike]:
+        """테스트 저장소에서는 등록된 참조 필지 중 공식지가가 있는 필지만 후보로 쓴다."""
+        return [
+            parcel
+            for parcel in self.reference_parcels
+            if _valid_price(_value(parcel, "official_price_per_m2")) is not None
+        ]
 
 
 def _value(parcel: ParcelLike, field: str, default: Any = None) -> Any:
@@ -186,7 +214,14 @@ def _same_parcel(left: ParcelLike, right: ParcelLike) -> bool:
 
 def _centroid_distance_m(left: ParcelLike, right: ParcelLike) -> float | None:
     try:
-        distance = float(_geometry(left).centroid.distance(_geometry(right).centroid))
+        left_centroid = _geometry(left).centroid
+        right_centroid = _geometry(right).centroid
+        for centroid in (left_centroid, right_centroid):
+            x = float(getattr(centroid, "x"))
+            y = float(getattr(centroid, "y"))
+            if -180 <= x <= 180 and -90 <= y <= 90:
+                return None
+        distance = float(left_centroid.distance(right_centroid))
     except (AttributeError, TypeError, ValueError):
         return None
     if not math.isfinite(distance) or distance < 0:
@@ -194,22 +229,29 @@ def _centroid_distance_m(left: ParcelLike, right: ParcelLike) -> float | None:
     return distance
 
 
-def _official_median(
+def _official_prices(parcels: Sequence[ParcelLike]) -> list[float]:
+    return [
+        price
+        for parcel in parcels
+        if (price := _valid_price(_value(parcel, "official_price_per_m2"))) is not None
+    ]
+
+
+def _official_average(
     parcels: Sequence[ParcelLike],
     *,
     code_field: str,
     code_value: str,
-    land_type: str,
 ) -> float | None:
+    if not code_value:
+        return None
     prices = [
         price
         for parcel in parcels
         if str(_value(parcel, code_field) or "") == code_value
-        and str(_value(parcel, "land_type") or "") == land_type
-        and (price := _valid_price(_value(parcel, "official_price_per_m2")))
-        is not None
+        and (price := _valid_price(_value(parcel, "official_price_per_m2"))) is not None
     ]
-    return float(median(prices)) if prices else None
+    return sum(prices) / len(prices) if prices else None
 
 
 def estimate_missing_land_price_knn(
@@ -218,14 +260,13 @@ def estimate_missing_land_price_knn(
     k: int = DEFAULT_K,
     max_distance_m: float = DEFAULT_MAX_DISTANCE_M,
 ) -> tuple[float | None, dict[str, Any]]:
-    """공식가격이 없는 필지만 거리 가중 KNN으로 가격을 추정한다."""
+    """공식가격이 없는 필지만 centroid 거리 가중 KNN으로 가격을 추정한다."""
     if k < 1:
         raise ValueError("k는 1 이상이어야 합니다.")
     if max_distance_m <= 0:
         raise ValueError("max_distance_m은 0보다 커야 합니다.")
 
-    target_land_type = str(_value(target_parcel, "land_type") or "")
-    candidates: list[tuple[float, float, bool]] = []
+    candidates: list[tuple[float, float]] = []
     for neighbor in nearby_parcels:
         if _same_parcel(target_parcel, neighbor):
             continue
@@ -235,34 +276,31 @@ def estimate_missing_land_price_knn(
         distance = _centroid_distance_m(target_parcel, neighbor)
         if distance is None or distance > max_distance_m:
             continue
-        candidates.append(
-            (
-                distance,
-                price,
-                str(_value(neighbor, "land_type") or "") == target_land_type,
-            )
-        )
+        if distance == 0:
+            return price, {
+                "neighbor_count": 1,
+                "knn_search_radius_m": float(max_distance_m),
+                "mean_distance_m": 0.0,
+                "source": "knn",
+            }
+        candidates.append((distance, price))
 
-    same_type = [candidate for candidate in candidates if candidate[2]]
-    used_same_land_type = len(same_type) >= k
-    active_candidates = same_type if used_same_land_type else candidates
-    selected = sorted(active_candidates, key=lambda item: item[0])[:k]
+    selected = sorted(candidates, key=lambda item: item[0])[:k]
     metadata = {
         "neighbor_count": len(selected),
-        "max_distance_m": float(max_distance_m),
-        "used_same_land_type": used_same_land_type,
+        "knn_search_radius_m": float(max_distance_m),
         "mean_distance_m": (
             round(sum(item[0] for item in selected) / len(selected), 3)
             if selected
             else None
         ),
-        "source": "knn_fallback",
+        "source": "knn",
     }
     if not selected:
         return None, metadata
 
-    weighted_sum = sum(price / (distance + 1.0) for distance, price, _ in selected)
-    weight_sum = sum(1.0 / (distance + 1.0) for distance, _, _ in selected)
+    weighted_sum = sum(price / distance for distance, price in selected)
+    weight_sum = sum(1.0 / distance for distance, _ in selected)
     return weighted_sum / weight_sum, metadata
 
 
@@ -273,54 +311,75 @@ def _resolve_land_price_with_metadata(
     k: int,
     max_distance_m: float,
     default_price_per_m2: float,
-) -> tuple[float, str, dict[str, Any]]:
+) -> tuple[float | None, str, dict[str, Any]]:
     official_price = _valid_price(_value(parcel, "official_price_per_m2"))
     if official_price is not None:
-        return official_price, "official", {"source": "official"}
+        return official_price, "official", {
+            "source": "official",
+            "knn_neighbor_count": 0,
+            "knn_search_radius_m": None,
+        }
 
     lawd_code = str(_value(parcel, "lawd_code") or "")
     sigungu_code = str(_value(parcel, "sigungu_code") or "")
-    land_type = str(_value(parcel, "land_type") or "")
 
-    lawd_median = _official_median(
+    for radius_m, source in (
+        (max_distance_m, "knn_2km"),
+        (FALLBACK_KNN_RADIUS_M, "knn_5km"),
+    ):
+        knn_price, knn_metadata = estimate_missing_land_price_knn(
+            parcel,
+            reference_parcels,
+            k=k,
+            max_distance_m=radius_m,
+        )
+        if knn_price is not None:
+            return knn_price, source, {
+                **knn_metadata,
+                "source": source,
+                "knn_neighbor_count": knn_metadata.get("neighbor_count", 0),
+                "knn_search_radius_m": radius_m,
+            }
+
+    district_avg = _official_average(
         reference_parcels,
         code_field="lawd_code",
         code_value=lawd_code,
-        land_type=land_type,
     )
-    if lawd_median is not None:
-        return (
-            lawd_median,
-            "lawd_land_type_median",
-            {"source": "lawd_land_type_median"},
-        )
+    if district_avg is not None:
+        return district_avg, "district_avg", {
+            "source": "district_avg",
+            "knn_neighbor_count": 0,
+            "knn_search_radius_m": None,
+        }
 
-    knn_price, knn_metadata = estimate_missing_land_price_knn(
-        parcel,
-        reference_parcels,
-        k=k,
-        max_distance_m=max_distance_m,
-    )
-    if knn_price is not None:
-        return knn_price, "knn_fallback", knn_metadata
-
-    sigungu_median = _official_median(
+    province_avg = _official_average(
         reference_parcels,
         code_field="sigungu_code",
         code_value=sigungu_code,
-        land_type=land_type,
     )
-    if sigungu_median is not None:
-        return (
-            sigungu_median,
-            "sigungu_land_type_median",
-            {"source": "sigungu_land_type_median"},
-        )
+    if province_avg is not None:
+        return province_avg, "province_avg", {
+            "source": "province_avg",
+            "knn_neighbor_count": 0,
+            "knn_search_radius_m": None,
+        }
 
-    default_price = _valid_price(default_price_per_m2)
-    if default_price is None:
-        default_price = DEFAULT_PRICE_PER_M2
-    return default_price, "default", {"source": "default"}
+    global_prices = _official_prices(reference_parcels)
+    if global_prices:
+        return float(median(global_prices)), "global_median", {
+            "source": "global_median",
+            "knn_neighbor_count": 0,
+            "knn_search_radius_m": None,
+        }
+
+    _ = default_price_per_m2
+    return None, "missing", {
+        "source": "missing",
+        "knn_neighbor_count": 0,
+        "knn_search_radius_m": None,
+        "reason": "no_official_or_neighbor_price",
+    }
 
 
 def resolve_land_price(
@@ -330,8 +389,8 @@ def resolve_land_price(
     k: int = DEFAULT_K,
     max_distance_m: float = DEFAULT_MAX_DISTANCE_M,
     default_price_per_m2: float = DEFAULT_PRICE_PER_M2,
-) -> tuple[float, str]:
-    """공식값, 법정동 중앙값, KNN, 시군구 중앙값, 기본값 순으로 가격을 결정한다."""
+) -> tuple[float | None, str]:
+    """공식값, KNN, 행정구역 평균, 전체 중앙값 순으로 가격을 결정한다."""
     price, source, _ = _resolve_land_price_with_metadata(
         parcel,
         reference_parcels,
@@ -361,6 +420,24 @@ def get_intersected_parcels(
     return active_repository.get_intersected_parcels(route_geom, road_width_m)
 
 
+def _get_route_reference_parcels(
+    repository: ParcelRepository,
+    route_geom: Any,
+    search_radius_m: float,
+) -> list[ParcelLike]:
+    provider = getattr(repository, "get_reference_parcels_around_route", None)
+    if callable(provider):
+        return list(provider(route_geom, search_radius_m))
+    return []
+
+
+def _empty_price_source_summary() -> dict[str, dict[str, float | int]]:
+    return {
+        source: {"parcel_count": 0, "compensation_total": 0.0}
+        for source in PRICE_SOURCE_KEYS
+    }
+
+
 def _empty_result(
     *,
     factor: float,
@@ -379,8 +456,10 @@ def _empty_result(
         "land_compensation_by_land_type": {
             land_type: 0.0 for land_type in LAND_COMPENSATION_MULTIPLIERS
         },
+        "price_source_summary": _empty_price_source_summary(),
         "items": [],
         "warnings": [warning] if warning else [],
+        "explanation": LAND_COMPENSATION_EXPLANATION,
     }
 
 
@@ -394,7 +473,7 @@ def estimate_land_compensation(
     max_distance_m: float = DEFAULT_MAX_DISTANCE_M,
     default_price_per_m2: float = DEFAULT_PRICE_PER_M2,
 ) -> dict[str, Any]:
-    """편입면적 × 결정 공시지가 × 보정계수로 후보 노선의 토지보상비를 계산한다."""
+    """편입면적 x 결정 공시지가 x 보상계수로 후보 노선의 토지보상비를 계산한다."""
     active_repository = repository or NullParcelRepository()
     if factor <= 0:
         raise ValueError("factor는 0보다 커야 합니다.")
@@ -437,6 +516,17 @@ def estimate_land_compensation(
     compensation_by_land_type = {
         land_type: 0.0 for land_type in LAND_COMPENSATION_MULTIPLIERS
     }
+    price_source_summary = _empty_price_source_summary()
+    try:
+        route_reference_parcels = _get_route_reference_parcels(
+            active_repository,
+            route_geom,
+            FALLBACK_KNN_RADIUS_M,
+        )
+    except Exception as error:
+        route_reference_parcels = []
+        warnings.append(f"노선 주변 KNN 후보 필지 조회 실패 ({error})")
+
     for parcel in parcels:
         pnu = str(_value(parcel, "pnu") or "")
         try:
@@ -452,13 +542,19 @@ def estimate_land_compensation(
         if official_price is not None:
             price = official_price
             source = "official"
-            metadata = {"source": "official"}
+            metadata = {
+                "source": "official",
+                "knn_neighbor_count": 0,
+                "knn_search_radius_m": None,
+            }
         else:
-            try:
-                reference_parcels = active_repository.get_reference_parcels(parcel)
-            except Exception as error:
-                reference_parcels = []
-                warnings.append(f"{pnu or 'PNU 미상'}: 참조 필지 조회 실패 ({error})")
+            reference_parcels = route_reference_parcels
+            if not reference_parcels:
+                try:
+                    reference_parcels = active_repository.get_reference_parcels(parcel)
+                except Exception as error:
+                    reference_parcels = []
+                    warnings.append(f"{pnu or 'PNU 미상'}: 참조 필지 조회 실패 ({error})")
 
             try:
                 price, source, metadata = _resolve_land_price_with_metadata(
@@ -469,9 +565,13 @@ def estimate_land_compensation(
                     default_price_per_m2=default_price_per_m2,
                 )
             except Exception as error:
-                price = _valid_price(default_price_per_m2) or DEFAULT_PRICE_PER_M2
-                source = "default"
-                metadata = {"source": "default"}
+                price = None
+                source = "missing"
+                metadata = {
+                    "source": "missing",
+                    "knn_neighbor_count": 0,
+                    "knn_search_radius_m": None,
+                }
                 warnings.append(f"{pnu or 'PNU 미상'}: 가격 결정 실패 ({error})")
 
         land_category_raw = _land_category_raw(parcel)
@@ -481,23 +581,43 @@ def estimate_land_compensation(
             if land_type != "unknown"
             else factor
         )
-        land_cost = area_m2 * price * compensation_multiplier
+        land_cost = area_m2 * price * compensation_multiplier if price is not None else 0.0
         source_counts[source] = source_counts.get(source, 0) + 1
         compensation_by_land_type[land_type] += land_cost
+        price_source_summary.setdefault(
+            source,
+            {"parcel_count": 0, "compensation_total": 0.0},
+        )
+        price_source_summary[source]["parcel_count"] += 1
+        price_source_summary[source]["compensation_total"] += land_cost
+        if price is None:
+            warnings.append(
+                f"{pnu or 'PNU 미상'}: 공시지가를 추정하지 못해 보상비 계산에서 제외했습니다."
+            )
+
         item = {
             "pnu": pnu,
             "land_category_raw": land_category_raw,
             "land_type": land_type,
             "acquired_area_m2": round(area_m2, 3),
-            "estimated_land_price": round(price, 3),
+            "official_land_price": (
+                round(official_price, 3) if official_price is not None else None
+            ),
+            "estimated_land_price": round(price, 3) if price is not None else None,
+            "price_source": source,
+            "knn_neighbor_count": int(
+                metadata.get("knn_neighbor_count")
+                or metadata.get("neighbor_count")
+                or 0
+            ),
+            "knn_search_radius_m": metadata.get("knn_search_radius_m"),
             "compensation_multiplier": compensation_multiplier,
             "estimated_compensation": round(land_cost, 3),
             "area_m2": round(area_m2, 3),
-            "price_per_m2": round(price, 3),
-            "price_source": source,
+            "price_per_m2": round(price, 3) if price is not None else None,
             "land_cost": round(land_cost, 3),
         }
-        if source == "knn_fallback":
+        if source in {"knn_2km", "knn_5km"}:
             item["price_metadata"] = metadata
         items.append(item)
 
@@ -516,8 +636,16 @@ def estimate_land_compensation(
             land_type: round(value, 3)
             for land_type, value in compensation_by_land_type.items()
         },
+        "price_source_summary": {
+            source: {
+                "parcel_count": int(summary["parcel_count"]),
+                "compensation_total": round(float(summary["compensation_total"]), 3),
+            }
+            for source, summary in price_source_summary.items()
+        },
         "items": items,
         "warnings": warnings,
+        "explanation": LAND_COMPENSATION_EXPLANATION,
     }
 
 

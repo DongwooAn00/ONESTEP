@@ -8,6 +8,7 @@ from typing import Protocol
 from app.db import connect
 from app.schemas.od_candidates import CandidateEdge, CandidateNode
 from app.services import route_mvp_config as config
+from app.services.rock_class_estimator import estimate_rock_class
 from app.services.road_network import ROAD_PROJ4
 from app.services.route_cost import DEM_PROJ4
 from app.services.region_filter import RegionContext
@@ -329,6 +330,25 @@ def _layer_text_expression(table_name: str) -> str:
     return f"COALESCE({', '.join(columns)}, '')" if columns else "''"
 
 
+def _quote_ident(identifier: str) -> str:
+    return '"' + identifier.replace('"', '""') + '"'
+
+
+def _geology_refrock_expression(table_name: str) -> str:
+    available = _table_columns(table_name)
+    columns = [
+        column
+        for column in ("refrock", "ROCK", "rock", "lithology", "LITHO", "lithoname")
+        if column in available
+    ]
+    if not columns:
+        return "NULL"
+    table = _quote_ident(table_name)
+    return "COALESCE(" + ", ".join(
+        f"NULLIF({table}.{_quote_ident(column)}::text, '')" for column in columns
+    ) + ")"
+
+
 def _normalize_river_rank(value: object) -> str:
     text = str(value or "").lower()
     if any(token in text for token in ("national", "major", "large", "국가", "대하천", "큰")):
@@ -500,6 +520,109 @@ def _apply_optional_roads(grid: CostGrid) -> None:
                 cell.road_distance_m = float(result[2])
     except Exception as error:
         grid.warnings.append(f"기존 도로망 비용 보정을 건너뜁니다: {error}")
+
+
+def _apply_optional_geology(grid: CostGrid) -> None:
+    litho_table = _find_existing_table(["geology_litho"])
+    fault_table = _find_existing_table(["geology_faults"])
+    boundary_table = _find_existing_table(["geology_boundaries"])
+    if litho_table is None and fault_table is None and boundary_table is None:
+        grid.warnings.append("수치지질도 레이어가 없어 암반등급·단층거리·지질경계거리를 반영하지 못했습니다.")
+        return
+
+    cells = [cell for row_cells in grid.cells for cell in row_cells]
+    refrock_expression = _geology_refrock_expression(litho_table) if litho_table is not None else "NULL"
+    litho_join = (
+        f"""
+        LEFT JOIN LATERAL (
+            SELECT {refrock_expression} AS refrock
+            FROM {_quote_ident(litho_table)}
+            ORDER BY
+                {_quote_ident(litho_table)}.geom <-> input_points.geom,
+                ST_Area({_quote_ident(litho_table)}.geom) ASC
+            LIMIT 1
+        ) AS litho ON TRUE
+        """
+        if litho_table is not None
+        else "LEFT JOIN LATERAL (SELECT NULL::text AS refrock) AS litho ON TRUE"
+    )
+    fault_join = (
+        f"""
+        LEFT JOIN LATERAL (
+            SELECT ST_Distance({_quote_ident(fault_table)}.geom::geography, input_points.geom::geography) AS fault_dist_m
+            FROM {_quote_ident(fault_table)}
+            ORDER BY {_quote_ident(fault_table)}.geom <-> input_points.geom
+            LIMIT 1
+        ) AS fault ON TRUE
+        """
+        if fault_table is not None
+        else "LEFT JOIN LATERAL (SELECT NULL::double precision AS fault_dist_m) AS fault ON TRUE"
+    )
+    boundary_join = (
+        f"""
+        LEFT JOIN LATERAL (
+            SELECT ST_Distance({_quote_ident(boundary_table)}.geom::geography, input_points.geom::geography) AS boundary_dist_m
+            FROM {_quote_ident(boundary_table)}
+            ORDER BY {_quote_ident(boundary_table)}.geom <-> input_points.geom
+            LIMIT 1
+        ) AS boundary ON TRUE
+        """
+        if boundary_table is not None
+        else "LEFT JOIN LATERAL (SELECT NULL::double precision AS boundary_dist_m) AS boundary ON TRUE"
+    )
+    try:
+        with connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    f"""
+                    WITH input_points AS (
+                        SELECT
+                            ordinality AS point_index,
+                            ST_SetSRID(ST_MakePoint(lon, lat), 4326) AS geom
+                        FROM unnest(
+                            %s::double precision[],
+                            %s::double precision[]
+                        ) WITH ORDINALITY AS points(lon, lat, ordinality)
+                    )
+                    SELECT
+                        input_points.point_index,
+                        litho.refrock,
+                        fault.fault_dist_m,
+                        boundary.boundary_dist_m
+                    FROM input_points
+                    {litho_join}
+                    {fault_join}
+                    {boundary_join}
+                    ORDER BY input_points.point_index;
+                    """,
+                    (
+                        [cell.lon for cell in cells],
+                        [cell.lat for cell in cells],
+                    ),
+                )
+                results = cursor.fetchall()
+    except Exception as error:
+        grid.warnings.append(f"수치지질도 반영을 건너뜁니다: {error}")
+        return
+
+    for cell, result in zip(cells, results):
+        _, refrock, fault_dist_m, boundary_dist_m = result
+        fault = float(fault_dist_m) if fault_dist_m is not None else None
+        boundary = float(boundary_dist_m) if boundary_dist_m is not None else None
+        estimate = estimate_rock_class(
+            refrock=refrock,
+            overburden_m=None,
+            slope_deg=cell.slope_degrees,
+            fault_dist_m=fault,
+            boundary_dist_m=boundary,
+        )
+        cell.estimated_rock_class = estimate.estimated_rock_class
+        cell.rock_class = estimate.estimated_rock_class
+        cell.fault_dist_m = fault
+        cell.boundary_dist_m = boundary
+        cell.rock_ground_factor = estimate.rock_ground_factor
+        cell.rock_constructability = estimate.rock_constructability
+        cell.risk_reasons = list(estimate.risk_reasons)
 
 
 def _apply_optional_protected_areas_legacy(grid: CostGrid) -> None:
@@ -921,6 +1044,7 @@ def build_cost_grid(
         _apply_optional_rivers(grid)
         if apply_existing_road_bias:
             _apply_optional_roads(grid)
+        _apply_optional_geology(grid)
         _apply_optional_protected_areas_batched(grid)
     return grid, start, end
 

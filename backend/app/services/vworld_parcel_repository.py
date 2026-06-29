@@ -268,6 +268,40 @@ class VWorldParcelRepository:
                 if parcel.lawd_code == lawd_code
             ]
 
+    def get_reference_parcels_around_route(
+        self,
+        route_geom,
+        search_radius_m: float,
+    ) -> list[ParcelLike]:
+        search_area = route_geom.buffer(search_radius_m)
+        min_x, min_y, max_x, max_y = search_area.bounds
+        min_tile_x = math.floor(min_x / self.tile_size_m)
+        max_tile_x = math.floor(max_x / self.tile_size_m)
+        min_tile_y = math.floor(min_y / self.tile_size_m)
+        max_tile_y = math.floor(max_y / self.tile_size_m)
+        tiles = [
+            (tile_x, tile_y)
+            for tile_x in range(min_tile_x, max_tile_x + 1)
+            for tile_y in range(min_tile_y, max_tile_y + 1)
+            if box(
+                tile_x * self.tile_size_m,
+                tile_y * self.tile_size_m,
+                (tile_x + 1) * self.tile_size_m,
+                (tile_y + 1) * self.tile_size_m,
+            ).intersects(search_area)
+        ]
+        if len(tiles) > self.max_tiles:
+            raise VWorldRequestError(
+                f"Parcel KNN search requires {len(tiles)} WFS tiles; limit is {self.max_tiles}."
+            )
+
+        parcels: dict[str, Parcel] = {}
+        for tile_x, tile_y in tiles:
+            for parcel in self._fetch_tile(tile_x, tile_y):
+                if parcel.official_price_per_m2 is not None and parcel.geometry.intersects(search_area):
+                    parcels[parcel.pnu] = parcel
+        return list(parcels.values())
+
 
 @lru_cache(maxsize=1)
 def get_default_parcel_repository() -> VWorldParcelRepository:

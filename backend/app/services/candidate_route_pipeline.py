@@ -18,6 +18,7 @@ from app.services.cost_grid import (
 )
 from app.services.cost_model import calculate_route_costs, evaluate_candidate_against_baseline
 from app.services.land_compensation import (
+    LAND_COMPENSATION_EXPLANATION,
     NullParcelRepository,
     ParcelRepository,
     estimate_land_compensation,
@@ -77,6 +78,18 @@ def _simplify_coordinate_sequence(
 
 
 def _empty_land_compensation(road_width_m: float = DEFAULT_ROAD_WIDTH_M) -> dict:
+    price_source_summary = {
+        source: {"parcel_count": 0, "compensation_total": 0.0}
+        for source in (
+            "official",
+            "knn_2km",
+            "knn_5km",
+            "district_avg",
+            "province_avg",
+            "global_median",
+            "missing",
+        )
+    }
     return {
         "total_land_compensation": 0.0,
         "factor": 1.5,
@@ -93,8 +106,10 @@ def _empty_land_compensation(road_width_m: float = DEFAULT_ROAD_WIDTH_M) -> dict
             "commercial_industrial": 0.0,
             "unknown": 0.0,
         },
+        "price_source_summary": price_source_summary,
         "items": [],
         "warnings": [],
+        "explanation": LAND_COMPENSATION_EXPLANATION,
     }
 
 
@@ -889,6 +904,7 @@ def _public_route(row: dict) -> dict:
             "land_compensation_by_land_type",
             {},
         ),
+        "price_source_summary": land_compensation.get("price_source_summary", {}),
         "annual_benefit": row.get("annual_benefit", 0.0),
         "annual_time_benefit": row.get("annual_time_benefit", 0.0),
         "annual_distance_benefit": row.get("annual_distance_benefit", 0.0),
