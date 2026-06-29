@@ -517,15 +517,20 @@ def estimate_land_compensation(
         land_type: 0.0 for land_type in LAND_COMPENSATION_MULTIPLIERS
     }
     price_source_summary = _empty_price_source_summary()
-    try:
-        route_reference_parcels = _get_route_reference_parcels(
-            active_repository,
-            route_geom,
-            FALLBACK_KNN_RADIUS_M,
-        )
-    except Exception as error:
-        route_reference_parcels = []
-        warnings.append(f"노선 주변 KNN 후보 필지 조회 실패 ({error})")
+    route_reference_parcels = []
+    needs_reference_prices = any(
+        _valid_price(_value(parcel, "official_price_per_m2")) is None
+        for parcel in parcels
+    )
+    if needs_reference_prices:
+        try:
+            route_reference_parcels = _get_route_reference_parcels(
+                active_repository,
+                route_geom,
+                FALLBACK_KNN_RADIUS_M,
+            )
+        except Exception as error:
+            warnings.append(f"노선 주변 KNN 후보 필지 조회 실패 ({error})")
 
     for parcel in parcels:
         pnu = str(_value(parcel, "pnu") or "")

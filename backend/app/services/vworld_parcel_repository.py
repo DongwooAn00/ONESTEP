@@ -5,6 +5,7 @@ import math
 import os
 import re
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -20,11 +21,13 @@ from app.services.vworld_land_price import VWorldConfigError, VWorldRequestError
 
 
 VWORLD_WFS_URL = "https://api.vworld.kr/req/wfs"
-VWORLD_PARCEL_LAYERS = "lp_pa_cbnd_bonbun,lp_pa_cbnd_bubun"
+VWORLD_PARCEL_LAYER = "lp_pa_cbnd_bubun"
 DEFAULT_TILE_SIZE_M = 2_000.0
 DEFAULT_MAX_FEATURES = 1_000
-DEFAULT_MAX_PAGES = 20
 DEFAULT_MAX_TILES = 120
+DEFAULT_MAX_SPLIT_DEPTH = 8
+DEFAULT_MAX_REQUESTS_PER_TILE = 512
+DEFAULT_MAX_RETRIES = 2
 
 
 @lru_cache(maxsize=1)
@@ -50,6 +53,21 @@ def _to_float(value) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) and number > 0 else None
+
+
+def _to_nonnegative_int(value, default: int = 0) -> int:
+    try:
+        number = int(str(value).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return default
+    return number if number >= 0 else default
+
+
+def _publication_key(properties: dict) -> tuple[int, int, int]:
+    year = _to_nonnegative_int(properties.get("gosi_year"), -1)
+    month = _to_nonnegative_int(properties.get("gosi_month"), -1)
+    has_price = int(_to_float(properties.get("jiga")) is not None)
+    return year, month, has_price
 
 
 def _extract_land_category(properties: dict) -> str:
@@ -83,12 +101,28 @@ class VWorldParcelRepository:
         tile_size_m: float = DEFAULT_TILE_SIZE_M,
         timeout: float = 20.0,
         max_tiles: int = DEFAULT_MAX_TILES,
+        max_features: int = DEFAULT_MAX_FEATURES,
+        max_split_depth: int = DEFAULT_MAX_SPLIT_DEPTH,
+        max_requests_per_tile: int = DEFAULT_MAX_REQUESTS_PER_TILE,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> None:
         self.api_key = api_key or _credential("VWORLD_API_KEY")
         self.domain = domain or _credential("VWORLD_DOMAIN")
         self.tile_size_m = float(tile_size_m)
         self.timeout = float(timeout)
         self.max_tiles = int(max_tiles)
+        self.max_features = int(max_features)
+        self.max_split_depth = int(max_split_depth)
+        self.max_requests_per_tile = int(max_requests_per_tile)
+        self.max_retries = int(max_retries)
+        if self.max_features < 1:
+            raise ValueError("max_features must be greater than 0.")
+        if self.max_split_depth < 0:
+            raise ValueError("max_split_depth must be non-negative.")
+        if self.max_requests_per_tile < 1:
+            raise ValueError("max_requests_per_tile must be greater than 0.")
+        if self.max_retries < 0:
+            raise ValueError("max_retries must be non-negative.")
         self._tile_cache: dict[tuple[int, int], list[Parcel]] = {}
         self._parcel_cache: dict[str, Parcel] = {}
         self._lock = threading.RLock()
@@ -115,22 +149,19 @@ class VWorldParcelRepository:
             max(point[1] for point in corners),
         )
 
-    def _request_page(
+    def _request_bbox(
         self,
         bbox_wgs84: tuple[float, float, float, float],
-        *,
-        start_index: int,
     ) -> dict:
         params = {
             "service": "WFS",
             "request": "GetFeature",
             "version": "1.1.0",
-            "typeName": VWORLD_PARCEL_LAYERS,
+            "typeName": VWORLD_PARCEL_LAYER,
             "bbox": ",".join(f"{value:.8f}" for value in bbox_wgs84),
             "output": "application/json",
             "srsName": "EPSG:4326",
-            "maxFeatures": str(DEFAULT_MAX_FEATURES),
-            "startIndex": str(start_index),
+            "maxFeatures": str(self.max_features),
             "key": self.api_key,
             "domain": self.domain,
         }
@@ -138,17 +169,105 @@ class VWorldParcelRepository:
             f"{VWORLD_WFS_URL}?{urllib.parse.urlencode(params)}",
             method="GET",
         )
-        try:
-            with urllib.request.urlopen(request, timeout=self.timeout) as response:
-                raw = response.read()
-        except urllib.error.HTTPError as error:
-            raise VWorldRequestError(f"VWorld parcel WFS HTTP error: {error.code}") from error
-        except urllib.error.URLError as error:
-            raise VWorldRequestError(f"VWorld parcel WFS request failed: {error.reason}") from error
-        try:
-            return json.loads(raw.decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError) as error:
-            raise VWorldRequestError("VWorld parcel WFS JSON response could not be parsed.") from error
+        last_error: VWorldRequestError | None = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                    raw = response.read()
+                    headers = getattr(response, "headers", None)
+                    content_type = headers.get("Content-Type", "") if headers is not None else ""
+            except urllib.error.HTTPError as error:
+                retryable = error.code == 429 or error.code >= 500
+                last_error = VWorldRequestError(
+                    f"VWorld parcel WFS HTTP error: {error.code}"
+                )
+                if not retryable or attempt >= self.max_retries:
+                    raise last_error from error
+            except urllib.error.URLError as error:
+                last_error = VWorldRequestError(
+                    f"VWorld parcel WFS request failed: {error.reason}"
+                )
+                if attempt >= self.max_retries:
+                    raise last_error from error
+            else:
+                try:
+                    data = json.loads(raw.decode("utf-8"))
+                    if not isinstance(data, dict):
+                        raise ValueError("top-level JSON value is not an object")
+                    return data
+                except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+                    preview = " ".join(
+                        raw[:300].decode("utf-8", errors="replace").split()
+                    )
+                    last_error = VWorldRequestError(
+                        "VWorld parcel WFS returned a non-JSON response "
+                        f"(content-type={content_type or 'unknown'}, body={preview!r})."
+                    )
+                    if attempt >= self.max_retries:
+                        raise last_error from error
+
+            time.sleep(0.25 * (2**attempt))
+
+        if last_error is not None:
+            raise last_error
+        raise VWorldRequestError("VWorld parcel WFS request failed.")
+
+    @staticmethod
+    def _split_bbox(
+        bbox_wgs84: tuple[float, float, float, float],
+    ) -> tuple[tuple[float, float, float, float], ...]:
+        min_lon, min_lat, max_lon, max_lat = bbox_wgs84
+        mid_lon = (min_lon + max_lon) / 2.0
+        mid_lat = (min_lat + max_lat) / 2.0
+        return (
+            (min_lon, min_lat, mid_lon, mid_lat),
+            (mid_lon, min_lat, max_lon, mid_lat),
+            (min_lon, mid_lat, mid_lon, max_lat),
+            (mid_lon, mid_lat, max_lon, max_lat),
+        )
+
+    def _fetch_bbox_features(
+        self,
+        bbox_wgs84: tuple[float, float, float, float],
+        *,
+        depth: int,
+        request_count: list[int],
+    ) -> list[dict]:
+        request_count[0] += 1
+        if request_count[0] > self.max_requests_per_tile:
+            raise VWorldRequestError(
+                "VWorld parcel WFS spatial subdivision exceeded "
+                f"{self.max_requests_per_tile} requests for one tile."
+            )
+
+        data = self._request_bbox(bbox_wgs84)
+        raw_features = data.get("features", [])
+        if not isinstance(raw_features, list):
+            raise VWorldRequestError("VWorld parcel WFS features must be a list.")
+        features = [feature for feature in raw_features if isinstance(feature, dict)]
+        total_value = data.get("totalFeatures")
+        total = _to_nonnegative_int(total_value, len(features))
+        is_truncated = total > len(features) or (
+            total_value in (None, "") and len(features) >= self.max_features
+        )
+        if not is_truncated:
+            return features
+        if depth >= self.max_split_depth:
+            raise VWorldRequestError(
+                "VWorld parcel WFS still exceeds the feature limit after "
+                f"{self.max_split_depth} spatial subdivisions."
+            )
+
+        split_features: list[dict] = []
+        for child_bbox in self._split_bbox(bbox_wgs84):
+            split_features.extend(
+                self._fetch_bbox_features(
+                    child_bbox,
+                    depth=depth + 1,
+                    request_count=request_count,
+                )
+            )
+        return split_features
 
     def _fetch_tile(self, tile_x: int, tile_y: int) -> list[Parcel]:
         key = (tile_x, tile_y)
@@ -158,32 +277,24 @@ class VWorldParcelRepository:
                 return cached
 
         bbox_wgs84 = self._tile_bounds_wgs84(tile_x, tile_y)
-        features: list[dict] = []
-        start_index = 0
-        for _ in range(DEFAULT_MAX_PAGES):
-            data = self._request_page(bbox_wgs84, start_index=start_index)
-            page = [
-                feature
-                for feature in data.get("features", [])
-                if isinstance(feature, dict)
-            ]
-            features.extend(page)
-            total = int(data.get("totalFeatures") or len(features))
-            if not page or len(features) >= total:
-                break
-            start_index += len(page)
-        else:
-            raise VWorldRequestError(
-                f"VWorld parcel WFS pagination exceeded {DEFAULT_MAX_PAGES} pages."
-            )
+        features = self._fetch_bbox_features(
+            bbox_wgs84,
+            depth=0,
+            request_count=[0],
+        )
 
         wgs84_to_dem, _ = _transformers()
         parcels_by_pnu: dict[str, Parcel] = {}
+        publication_by_pnu: dict[str, tuple[int, int, int]] = {}
         for feature in features:
             properties = feature.get("properties") or {}
             geometry_json = feature.get("geometry")
             pnu = str(properties.get("pnu") or "").strip()
             if not pnu or not geometry_json:
+                continue
+            publication_key = _publication_key(properties)
+            existing_key = publication_by_pnu.get(pnu)
+            if existing_key is not None and publication_key <= existing_key:
                 continue
             try:
                 source_geometry = shape(geometry_json)
@@ -214,6 +325,7 @@ class VWorldParcelRepository:
                 official_price_per_m2=_to_float(properties.get("jiga")),
             )
             parcels_by_pnu[pnu] = parcel
+            publication_by_pnu[pnu] = publication_key
 
         parcels = list(parcels_by_pnu.values())
         with self._lock:

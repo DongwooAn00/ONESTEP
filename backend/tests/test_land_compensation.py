@@ -174,6 +174,9 @@ def test_official_price_skips_reference_parcel_lookup() -> None:
         def get_reference_parcels(self, target_parcel):
             raise AssertionError("공식값이 있는 필지는 참조 필지를 조회하면 안 됩니다.")
 
+        def get_reference_parcels_around_route(self, route_geom, search_radius_m):
+            raise AssertionError("공식값이 있는 노선은 주변 필지를 조회하면 안 됩니다.")
+
     result = estimate_land_compensation(
         RouteGeometry(),
         road_width_m=20,
