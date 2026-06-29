@@ -1205,7 +1205,7 @@ function AnalysisPage({
         onGoCreate={onGoCreate}
       />
 
-      <section className="main-panel">
+      <section className={`main-panel ${candidateRouteResult || stats ? "main-panel-split" : ""}`}>
         <section className="map-card" aria-label="선택된 시나리오 지도">
           <div className="map-toolbar">
             <span className="legend candidate" />
@@ -1797,8 +1797,10 @@ function PostList({ posts, onLikePost }) {
 function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const [analysisStatus, setAnalysisStatus] = useState("idle");
   const [routeStatus, setRouteStatus] = useState("idle");
+  const [analysisElapsedSeconds, setAnalysisElapsedSeconds] = useState(0);
   const [routeElapsedSeconds, setRouteElapsedSeconds] = useState(0);
   const [columnWidths, setColumnWidths] = useState({ left: 520, right: 380 });
+  const [mapPanelHeight, setMapPanelHeight] = useState(720);
   const [uploadedFile, setUploadedFile] = useState(null);
   const [includeBaseOd, setIncludeBaseOd] = useState(true);
   const [selectedScenarioIds, setSelectedScenarioIds] = useState(
@@ -1829,6 +1831,10 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const hasSelectedOdSource = includeBaseOd || supplementalOdCount > 0;
   const useRegionFilter = !useAllRegions && selectedRegions.length > 0;
   const clampColumnWidth = (value, min, max) => Math.min(max, Math.max(min, value));
+  const clampPanelHeight = (value) => {
+    const maxHeight = Math.max(340, window.innerHeight - 220);
+    return Math.min(maxHeight, Math.max(280, value));
+  };
 
   const startColumnResize = useCallback(
     (side) => (event) => {
@@ -1863,11 +1869,47 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
     [columnWidths]
   );
 
+  const startMapPanelResize = useCallback(
+    (event) => {
+      event.preventDefault();
+      const startY = event.clientY;
+      const startHeight = mapPanelHeight;
+
+      const handlePointerMove = (moveEvent) => {
+        const deltaY = moveEvent.clientY - startY;
+        setMapPanelHeight(clampPanelHeight(startHeight + deltaY));
+      };
+
+      const handlePointerUp = () => {
+        window.removeEventListener("pointermove", handlePointerMove);
+        window.removeEventListener("pointerup", handlePointerUp);
+        document.body.classList.remove("row-resizing");
+      };
+
+      document.body.classList.add("row-resizing");
+      window.addEventListener("pointermove", handlePointerMove);
+      window.addEventListener("pointerup", handlePointerUp);
+    },
+    [mapPanelHeight]
+  );
+
   useEffect(() => {
     if (selectedScenarioId) {
       setSelectedScenarioIds((current) => (current.length ? current : [selectedScenarioId]));
     }
   }, [selectedScenarioId]);
+
+  useEffect(() => {
+    if (analysisStatus !== "loading") {
+      return undefined;
+    }
+    const startedAt = Date.now();
+    setAnalysisElapsedSeconds(0);
+    const timer = window.setInterval(() => {
+      setAnalysisElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [analysisStatus]);
 
   useEffect(() => {
     if (routeStatus !== "loading") {
@@ -2001,6 +2043,18 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
   const routeCosts = candidateRouteResult?.costs || [];
   const costByRouteId = new Map(routeCosts.map((cost) => [cost.route_id, cost]));
   const nodeById = new Map(nodes.map((node) => [node.node_id, node]));
+  const candidateLoadingSteps = [
+    "OD 출발·도착 좌표 정리",
+    "수요 가중치 계산",
+    "중심 후보 정점 군집화",
+    "후보 연결쌍 정렬"
+  ];
+  const activeLoadingStep = analysisStatus === "loading"
+    ? Math.min(
+        candidateLoadingSteps.length - 1,
+        Math.floor(analysisElapsedSeconds / 2) % candidateLoadingSteps.length
+      )
+    : 0;
 
   const focusConnectionPair = useCallback((type, id, fromNodeId, toNodeId) => {
     const fromNode = nodeById.get(fromNodeId);
@@ -2068,6 +2122,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
       style={{
         "--left-panel-width": `${columnWidths.left}px`,
         "--right-panel-width": `${columnWidths.right}px`,
+        "--map-panel-height": `${mapPanelHeight}px`,
       }}
     >
       <aside className="input-panel scenario-panel">
@@ -2277,7 +2332,7 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
         onPointerDown={startColumnResize("left")}
       />
 
-      <section className="main-panel">
+      <section className={`main-panel ${candidateRouteResult || stats ? "main-panel-split" : ""}`}>
         <section className="map-card" aria-label="OD 기반 후보 정점과 후보 연결쌍 지도">
           <div className="map-toolbar">
             <span className="legend candidate" />
@@ -2305,6 +2360,16 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
           />
         </section>
 
+        {(candidateRouteResult || stats) && (
+          <>
+            <div
+              className="row-resizer"
+              role="separator"
+              aria-label="map result panel height resize"
+              aria-orientation="horizontal"
+              onPointerDown={startMapPanelResize}
+            />
+            <div className="map-bottom-panel">
         {candidateRouteResult && (
           <section className="od-table-card">
             <div className="section-head">
@@ -2422,6 +2487,9 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
             ))}
           </section>
         )}
+            </div>
+          </>
+        )}
       </section>
 
       {analysisStatus !== "idle" && (
@@ -2445,12 +2513,29 @@ function AnalysisMvpPage({ scenarios = [], selectedScenarioId }) {
         )}
 
         {analysisStatus === "loading" && (
-          <div className="result-empty">
-            <span>
+          <div className="result-empty candidate-loading-state">
+            <span className="loading-icon">
               <Network size={20} />
             </span>
-            <h2>후보 생성 중</h2>
+            <div className="loading-title-row">
+              <h2>후보 생성 중</h2>
+              <strong>{analysisElapsedSeconds}초</strong>
+            </div>
+            <div className="candidate-progress" aria-hidden="true">
+              <span />
+            </div>
             <p>전체 OD를 출발·도착 weighted point로 변환하고 sample_weight 기반 K-Means로 수요 중심 정점을 계산하고 있습니다.</p>
+            <ol className="loading-step-list" aria-label="후보 생성 진행 단계">
+              {candidateLoadingSteps.map((step, index) => (
+                <li
+                  className={index === activeLoadingStep ? "active" : ""}
+                  key={step}
+                >
+                  <span />
+                  {step}
+                </li>
+              ))}
+            </ol>
           </div>
         )}
 

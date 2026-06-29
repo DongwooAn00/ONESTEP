@@ -1,14 +1,14 @@
 [
   {
     "route_id": "R001-B",
-    "existing_road_length_km": 136.104,
-    "connector_length_km": 0.948,
+    "existing_road_length_km": 11.946,
+    "connector_length_km": 0.694,
     "new_surface_road_length_km": 0.0,
     "surface_road_length_km": 0.0,
     "tunnel_length_km": 0.0,
     "surface_road_cost": 0.0,
     "new_road_cost": 0.0,
-    "connector_cost": 174.432,
+    "connector_cost": 127.696,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -19,24 +19,30 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
-      "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
-      ],
+      "warnings": [],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 174.432,
+    "total_direct_cost": 127.696,
     "surface_road_screen_cost": 0.0,
     "new_road_screen_cost": 0.0,
-    "connector_screen_cost": 218.04,
+    "connector_screen_cost": 159.62,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 218.04,
+    "total_screen_cost": 159.62,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -53,13 +59,13 @@
   },
   {
     "route_id": "R001-D",
-    "existing_road_length_km": 4.538,
+    "existing_road_length_km": 1.921,
     "connector_length_km": 0.0,
-    "new_surface_road_length_km": 102.457,
-    "surface_road_length_km": 102.457,
+    "new_surface_road_length_km": 7.864,
+    "surface_road_length_km": 7.864,
     "tunnel_length_km": 0,
-    "surface_road_cost": 18852.088,
-    "new_road_cost": 18852.088,
+    "surface_road_cost": 1446.976,
+    "new_road_cost": 1446.976,
     "connector_cost": 0.0,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
@@ -71,24 +77,32 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 18852.088,
-    "surface_road_screen_cost": 23565.11,
-    "new_road_screen_cost": 23565.11,
+    "total_direct_cost": 1446.976,
+    "surface_road_screen_cost": 1808.72,
+    "new_road_screen_cost": 1808.72,
     "connector_screen_cost": 0.0,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 23565.11,
+    "total_screen_cost": 1808.72,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -105,14 +119,14 @@
   },
   {
     "route_id": "R001-H",
-    "existing_road_length_km": 55.811,
-    "connector_length_km": 0.948,
-    "new_surface_road_length_km": 70.681,
-    "surface_road_length_km": 70.681,
+    "existing_road_length_km": 6.335,
+    "connector_length_km": 0.694,
+    "new_surface_road_length_km": 5.243,
+    "surface_road_length_km": 5.243,
     "tunnel_length_km": 0,
-    "surface_road_cost": 13005.304,
-    "new_road_cost": 13005.304,
-    "connector_cost": 174.432,
+    "surface_road_cost": 964.712,
+    "new_road_cost": 964.712,
+    "connector_cost": 127.696,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -123,24 +137,32 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 13179.736,
-    "surface_road_screen_cost": 16256.63,
-    "new_road_screen_cost": 16256.63,
-    "connector_screen_cost": 218.04,
+    "total_direct_cost": 1092.408,
+    "surface_road_screen_cost": 1205.89,
+    "new_road_screen_cost": 1205.89,
+    "connector_screen_cost": 159.62,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 16474.67,
+    "total_screen_cost": 1365.51,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -157,14 +179,14 @@
   },
   {
     "route_id": "R001-P",
-    "existing_road_length_km": 60.14,
-    "connector_length_km": 0.948,
-    "new_surface_road_length_km": 74.161,
-    "surface_road_length_km": 74.161,
+    "existing_road_length_km": 7.608,
+    "connector_length_km": 0.694,
+    "new_surface_road_length_km": 3.328,
+    "surface_road_length_km": 3.328,
     "tunnel_length_km": 0,
-    "surface_road_cost": 13645.624,
-    "new_road_cost": 13645.624,
-    "connector_cost": 174.432,
+    "surface_road_cost": 612.352,
+    "new_road_cost": 612.352,
+    "connector_cost": 127.696,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -175,24 +197,30 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
-      "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
-      ],
+      "warnings": [],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 13820.056,
-    "surface_road_screen_cost": 17057.03,
-    "new_road_screen_cost": 17057.03,
-    "connector_screen_cost": 218.04,
+    "total_direct_cost": 740.048,
+    "surface_road_screen_cost": 765.44,
+    "new_road_screen_cost": 765.44,
+    "connector_screen_cost": 159.62,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 17275.07,
+    "total_screen_cost": 925.06,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -209,42 +237,64 @@
   },
   {
     "route_id": "R002-B",
-    "existing_road_length_km": 121.04,
-    "connector_length_km": 1.597,
+    "existing_road_length_km": 6.495,
+    "connector_length_km": 0.348,
     "new_surface_road_length_km": 0.0,
     "surface_road_length_km": 0.0,
     "tunnel_length_km": 0.0,
     "surface_road_cost": 0.0,
     "new_road_cost": 0.0,
-    "connector_cost": 293.848,
+    "connector_cost": 64.032,
     "tunnel_cost": 0.0,
-    "land_compensation_cost": 0.0,
+    "land_compensation_cost": 43.259,
     "land_compensation": {
-      "total_land_compensation": 0.0,
+      "total_land_compensation": 4325903975.215,
       "factor": 1.5,
       "road_width_m": 20.0,
-      "parcel_count": 0,
-      "official_count": 0,
+      "parcel_count": 1,
+      "official_count": 1,
       "estimated_count": 0,
-      "source_counts": {},
-      "items": [],
-      "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+      "source_counts": {
+        "official": 1
+      },
+      "land_compensation_total": 4325903975.215,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 4325903975.215,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [
+        {
+          "pnu": "2635010500115000000",
+          "land_category_raw": "대",
+          "land_type": "residential",
+          "acquired_area_m2": 409.417,
+          "estimated_land_price": 5870000.0,
+          "compensation_multiplier": 1.8,
+          "estimated_compensation": 4325903975.215,
+          "area_m2": 409.417,
+          "price_per_m2": 5870000.0,
+          "price_source": "official",
+          "land_cost": 4325903975.215
+        }
       ],
+      "warnings": [],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 293.848,
+    "total_direct_cost": 107.291,
     "surface_road_screen_cost": 0.0,
     "new_road_screen_cost": 0.0,
-    "connector_screen_cost": 367.31,
+    "connector_screen_cost": 80.04,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 367.31,
+    "total_screen_cost": 123.299,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -263,11 +313,11 @@
     "route_id": "R002-D",
     "existing_road_length_km": 0,
     "connector_length_km": 0.0,
-    "new_surface_road_length_km": 108.657,
-    "surface_road_length_km": 108.657,
+    "new_surface_road_length_km": 4.95,
+    "surface_road_length_km": 4.95,
     "tunnel_length_km": 0,
-    "surface_road_cost": 19992.888,
-    "new_road_cost": 19992.888,
+    "surface_road_cost": 910.8,
+    "new_road_cost": 910.8,
     "connector_cost": 0.0,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
@@ -279,24 +329,32 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 19992.888,
-    "surface_road_screen_cost": 24991.11,
-    "new_road_screen_cost": 24991.11,
+    "total_direct_cost": 910.8,
+    "surface_road_screen_cost": 1138.5,
+    "new_road_screen_cost": 1138.5,
     "connector_screen_cost": 0.0,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 24991.11,
+    "total_screen_cost": 1138.5,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -313,14 +371,14 @@
   },
   {
     "route_id": "R002-H",
-    "existing_road_length_km": 49.406,
-    "connector_length_km": 1.598,
-    "new_surface_road_length_km": 70.768,
-    "surface_road_length_km": 70.768,
+    "existing_road_length_km": 4.562,
+    "connector_length_km": 0.348,
+    "new_surface_road_length_km": 1.414,
+    "surface_road_length_km": 1.414,
     "tunnel_length_km": 0,
-    "surface_road_cost": 13021.312,
-    "new_road_cost": 13021.312,
-    "connector_cost": 294.032,
+    "surface_road_cost": 260.176,
+    "new_road_cost": 260.176,
+    "connector_cost": 64.032,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -331,24 +389,32 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 13315.344,
-    "surface_road_screen_cost": 16276.64,
-    "new_road_screen_cost": 16276.64,
-    "connector_screen_cost": 367.54,
+    "total_direct_cost": 324.208,
+    "surface_road_screen_cost": 325.22,
+    "new_road_screen_cost": 325.22,
+    "connector_screen_cost": 80.04,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 16644.18,
+    "total_screen_cost": 405.26,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -365,14 +431,14 @@
   },
   {
     "route_id": "R002-P",
-    "existing_road_length_km": 62.52,
-    "connector_length_km": 1.598,
-    "new_surface_road_length_km": 48.841,
-    "surface_road_length_km": 48.841,
+    "existing_road_length_km": 4.908,
+    "connector_length_km": 0.348,
+    "new_surface_road_length_km": 1.414,
+    "surface_road_length_km": 1.414,
     "tunnel_length_km": 0,
-    "surface_road_cost": 8986.744,
-    "new_road_cost": 8986.744,
-    "connector_cost": 294.032,
+    "surface_road_cost": 260.176,
+    "new_road_cost": 260.176,
+    "connector_cost": 64.032,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -383,24 +449,32 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 9280.776,
-    "surface_road_screen_cost": 11233.43,
-    "new_road_screen_cost": 11233.43,
-    "connector_screen_cost": 367.54,
+    "total_direct_cost": 324.208,
+    "surface_road_screen_cost": 325.22,
+    "new_road_screen_cost": 325.22,
+    "connector_screen_cost": 80.04,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 11600.97,
+    "total_screen_cost": 405.26,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -417,14 +491,14 @@
   },
   {
     "route_id": "R003-B",
-    "existing_road_length_km": 105.446,
-    "connector_length_km": 1.641,
+    "existing_road_length_km": 13.618,
+    "connector_length_km": 0.345,
     "new_surface_road_length_km": 0.0,
     "surface_road_length_km": 0.0,
     "tunnel_length_km": 0.0,
     "surface_road_cost": 0.0,
     "new_road_cost": 0.0,
-    "connector_cost": 301.944,
+    "connector_cost": 63.48,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -435,24 +509,30 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
-      "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
-      ],
+      "warnings": [],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 301.944,
+    "total_direct_cost": 63.48,
     "surface_road_screen_cost": 0.0,
     "new_road_screen_cost": 0.0,
-    "connector_screen_cost": 377.43,
+    "connector_screen_cost": 79.35,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 377.43,
+    "total_screen_cost": 79.35,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -469,13 +549,13 @@
   },
   {
     "route_id": "R003-D",
-    "existing_road_length_km": 3.966,
+    "existing_road_length_km": 1.413,
     "connector_length_km": 0.0,
-    "new_surface_road_length_km": 84.885,
-    "surface_road_length_km": 84.885,
+    "new_surface_road_length_km": 9.864,
+    "surface_road_length_km": 9.864,
     "tunnel_length_km": 0,
-    "surface_road_cost": 15618.84,
-    "new_road_cost": 15618.84,
+    "surface_road_cost": 1814.976,
+    "new_road_cost": 1814.976,
     "connector_cost": 0.0,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
@@ -487,24 +567,92 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 15618.84,
-    "surface_road_screen_cost": 19523.55,
-    "new_road_screen_cost": 19523.55,
+    "total_direct_cost": 1814.976,
+    "surface_road_screen_cost": 2268.72,
+    "new_road_screen_cost": 2268.72,
     "connector_screen_cost": 0.0,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 19523.55,
+    "total_screen_cost": 2268.72,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R003-H",
+    "existing_road_length_km": 10.464,
+    "connector_length_km": 0.345,
+    "new_surface_road_length_km": 2.121,
+    "surface_road_length_km": 2.121,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 390.264,
+    "new_road_cost": 390.264,
+    "connector_cost": 63.48,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 453.744,
+    "surface_road_screen_cost": 487.83,
+    "new_road_screen_cost": 487.83,
+    "connector_screen_cost": 79.35,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 567.18,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -521,14 +669,14 @@
   },
   {
     "route_id": "R003-P",
-    "existing_road_length_km": 56.675,
-    "connector_length_km": 1.642,
-    "new_surface_road_length_km": 42.881,
-    "surface_road_length_km": 42.881,
+    "existing_road_length_km": 7.655,
+    "connector_length_km": 0.345,
+    "new_surface_road_length_km": 5.328,
+    "surface_road_length_km": 5.328,
     "tunnel_length_km": 0,
-    "surface_road_cost": 7890.104,
-    "new_road_cost": 7890.104,
-    "connector_cost": 302.128,
+    "surface_road_cost": 980.352,
+    "new_road_cost": 980.352,
+    "connector_cost": 63.48,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -539,24 +687,32 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 8192.232,
-    "surface_road_screen_cost": 9862.63,
-    "new_road_screen_cost": 9862.63,
-    "connector_screen_cost": 377.66,
+    "total_direct_cost": 1043.832,
+    "surface_road_screen_cost": 1225.44,
+    "new_road_screen_cost": 1225.44,
+    "connector_screen_cost": 79.35,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 10240.29,
+    "total_screen_cost": 1304.79,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -573,14 +729,14 @@
   },
   {
     "route_id": "R004-B",
-    "existing_road_length_km": 162.667,
-    "connector_length_km": 3.379,
+    "existing_road_length_km": 10.121,
+    "connector_length_km": 0.297,
     "new_surface_road_length_km": 0.0,
     "surface_road_length_km": 0.0,
     "tunnel_length_km": 0.0,
     "surface_road_cost": 0.0,
     "new_road_cost": 0.0,
-    "connector_cost": 621.736,
+    "connector_cost": 54.648,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
@@ -591,24 +747,32 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 621.736,
+    "total_direct_cost": 54.648,
     "surface_road_screen_cost": 0.0,
     "new_road_screen_cost": 0.0,
-    "connector_screen_cost": 777.17,
+    "connector_screen_cost": 68.31,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 777.17,
+    "total_screen_cost": 68.31,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -625,13 +789,13 @@
   },
   {
     "route_id": "R004-D",
-    "existing_road_length_km": 0,
+    "existing_road_length_km": 5.749,
     "connector_length_km": 0.0,
-    "new_surface_road_length_km": 109.183,
-    "surface_road_length_km": 109.183,
+    "new_surface_road_length_km": 3.914,
+    "surface_road_length_km": 3.914,
     "tunnel_length_km": 0,
-    "surface_road_cost": 20089.672,
-    "new_road_cost": 20089.672,
+    "surface_road_cost": 720.176,
+    "new_road_cost": 720.176,
     "connector_cost": 0.0,
     "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
@@ -643,24 +807,92 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 20089.672,
-    "surface_road_screen_cost": 25112.09,
-    "new_road_screen_cost": 25112.09,
+    "total_direct_cost": 720.176,
+    "surface_road_screen_cost": 900.22,
+    "new_road_screen_cost": 900.22,
     "connector_screen_cost": 0.0,
     "tunnel_screen_cost": 0.0,
-    "total_screen_cost": 25112.09,
+    "total_screen_cost": 900.22,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R004-H",
+    "existing_road_length_km": 6.629,
+    "connector_length_km": 0.297,
+    "new_surface_road_length_km": 4.121,
+    "surface_road_length_km": 4.121,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 758.264,
+    "new_road_cost": 758.264,
+    "connector_cost": 54.648,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 812.912,
+    "surface_road_screen_cost": 947.83,
+    "new_road_screen_cost": 947.83,
+    "connector_screen_cost": 68.31,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 1016.14,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -677,15 +909,15 @@
   },
   {
     "route_id": "R004-P",
-    "existing_road_length_km": 94.609,
-    "connector_length_km": 3.38,
-    "new_surface_road_length_km": 51.51,
-    "surface_road_length_km": 51.51,
-    "tunnel_length_km": 2.577,
-    "surface_road_cost": 9477.84,
-    "new_road_cost": 9477.84,
-    "connector_cost": 621.92,
-    "tunnel_cost": 520.756,
+    "existing_road_length_km": 7.642,
+    "connector_length_km": 0.297,
+    "new_surface_road_length_km": 2.5,
+    "surface_road_length_km": 2.5,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 460.0,
+    "new_road_cost": 460.0,
+    "connector_cost": 54.648,
+    "tunnel_cost": 0.0,
     "land_compensation_cost": 0.0,
     "land_compensation": {
       "total_land_compensation": 0.0,
@@ -695,24 +927,32 @@
       "official_count": 0,
       "estimated_count": 0,
       "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
       "items": [],
       "warnings": [
-        "필지 경계/공시지가 저장소가 연결되지 않아 토지보상비를 0원으로 처리했습니다."
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
       ],
       "region_filter": {
         "enabled": true,
         "selected_regions": [
-          "강원특별자치도"
+          "부산광역시"
         ],
-        "buffer_km": 0.0
+        "buffer_km": 10.0
       }
     },
-    "total_direct_cost": 10620.516,
-    "surface_road_screen_cost": 11847.3,
-    "new_road_screen_cost": 11847.3,
-    "connector_screen_cost": 777.4,
-    "tunnel_screen_cost": 703.021,
-    "total_screen_cost": 13327.721,
+    "total_direct_cost": 514.648,
+    "surface_road_screen_cost": 575.0,
+    "new_road_screen_cost": 575.0,
+    "connector_screen_cost": 68.31,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 643.31,
     "cost_assumptions": {
       "unit": "eok_krw",
       "road_unit_cost_eok_per_km": 184.0,
@@ -720,7 +960,772 @@
       "f_urban": 1.0,
       "f_speed": 1.0,
       "f_ground": 1.3,
-      "f_length": 1.062,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R005-B",
+    "existing_road_length_km": 16.389,
+    "connector_length_km": 0.248,
+    "new_surface_road_length_km": 0.0,
+    "surface_road_length_km": 0.0,
+    "tunnel_length_km": 0.0,
+    "surface_road_cost": 0.0,
+    "new_road_cost": 0.0,
+    "connector_cost": 45.632,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 8.647,
+    "land_compensation": {
+      "total_land_compensation": 864709984.507,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 6,
+      "official_count": 6,
+      "estimated_count": 0,
+      "source_counts": {
+        "official": 6
+      },
+      "land_compensation_total": 864709984.507,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 666043280.9,
+        "commercial_industrial": 0.0,
+        "unknown": 198666703.607
+      },
+      "items": [
+        {
+          "pnu": "4812916400109170000",
+          "land_category_raw": "구",
+          "land_type": "unknown",
+          "acquired_area_m2": 124.679,
+          "estimated_land_price": 36000.0,
+          "compensation_multiplier": 1.5,
+          "estimated_compensation": 6732649.341,
+          "area_m2": 124.679,
+          "price_per_m2": 36000.0,
+          "price_source": "official",
+          "land_cost": 6732649.341
+        },
+        {
+          "pnu": "4812916400100200004",
+          "land_category_raw": "도",
+          "land_type": "unknown",
+          "acquired_area_m2": 59.013,
+          "estimated_land_price": 69300.0,
+          "compensation_multiplier": 1.5,
+          "estimated_compensation": 6134360.135,
+          "area_m2": 59.013,
+          "price_per_m2": 69300.0,
+          "price_source": "official",
+          "land_cost": 6134360.135
+        },
+        {
+          "pnu": "4812916400100200001",
+          "land_category_raw": "대",
+          "land_type": "residential",
+          "acquired_area_m2": 552.499,
+          "estimated_land_price": 669400.0,
+          "compensation_multiplier": 1.8,
+          "estimated_compensation": 665717113.761,
+          "area_m2": 552.499,
+          "price_per_m2": 669400.0,
+          "price_source": "official",
+          "land_cost": 665717113.761
+        },
+        {
+          "pnu": "4812916400100250001",
+          "land_category_raw": "대",
+          "land_type": "residential",
+          "acquired_area_m2": 0.271,
+          "estimated_land_price": 669400.0,
+          "compensation_multiplier": 1.8,
+          "estimated_compensation": 326167.139,
+          "area_m2": 0.271,
+          "price_per_m2": 669400.0,
+          "price_source": "official",
+          "land_cost": 326167.139
+        },
+        {
+          "pnu": "2644010900114520000",
+          "land_category_raw": "임",
+          "land_type": "unknown",
+          "acquired_area_m2": 36.259,
+          "estimated_land_price": 83900.0,
+          "compensation_multiplier": 1.5,
+          "estimated_compensation": 4563136.389,
+          "area_m2": 36.259,
+          "price_per_m2": 83900.0,
+          "price_source": "official",
+          "land_cost": 4563136.389
+        },
+        {
+          "pnu": "2644010900114540000",
+          "land_category_raw": "도",
+          "land_type": "unknown",
+          "acquired_area_m2": 607.463,
+          "estimated_land_price": 198900.0,
+          "compensation_multiplier": 1.5,
+          "estimated_compensation": 181236557.742,
+          "area_m2": 607.463,
+          "price_per_m2": 198900.0,
+          "price_source": "official",
+          "land_cost": 181236557.742
+        }
+      ],
+      "warnings": [],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 54.279,
+    "surface_road_screen_cost": 0.0,
+    "new_road_screen_cost": 0.0,
+    "connector_screen_cost": 57.04,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 65.687,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R005-D",
+    "existing_road_length_km": 2.325,
+    "connector_length_km": 0.0,
+    "new_surface_road_length_km": 13.656,
+    "surface_road_length_km": 13.656,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 2512.704,
+    "new_road_cost": 2512.704,
+    "connector_cost": 0.0,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 2512.704,
+    "surface_road_screen_cost": 3140.88,
+    "new_road_screen_cost": 3140.88,
+    "connector_screen_cost": 0.0,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 3140.88,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R005-H",
+    "existing_road_length_km": 8.55,
+    "connector_length_km": 0.248,
+    "new_surface_road_length_km": 9.571,
+    "surface_road_length_km": 9.571,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 1761.064,
+    "new_road_cost": 1761.064,
+    "connector_cost": 45.632,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 1806.696,
+    "surface_road_screen_cost": 2201.33,
+    "new_road_screen_cost": 2201.33,
+    "connector_screen_cost": 57.04,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 2258.37,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R005-P",
+    "existing_road_length_km": 9.717,
+    "connector_length_km": 0.248,
+    "new_surface_road_length_km": 6.621,
+    "surface_road_length_km": 6.621,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 1218.264,
+    "new_road_cost": 1218.264,
+    "connector_cost": 45.632,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 1263.896,
+    "surface_road_screen_cost": 1522.83,
+    "new_road_screen_cost": 1522.83,
+    "connector_screen_cost": 57.04,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 1579.87,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R006-B",
+    "existing_road_length_km": 6.325,
+    "connector_length_km": 0.287,
+    "new_surface_road_length_km": 0.0,
+    "surface_road_length_km": 0.0,
+    "tunnel_length_km": 0.0,
+    "surface_road_cost": 0.0,
+    "new_road_cost": 0.0,
+    "connector_cost": 52.808,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 59.673,
+    "land_compensation": {
+      "total_land_compensation": 5967335601.718,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 1,
+      "official_count": 1,
+      "estimated_count": 0,
+      "source_counts": {
+        "official": 1
+      },
+      "land_compensation_total": 5967335601.718,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 5967335601.718,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [
+        {
+          "pnu": "2641010700110530000",
+          "land_category_raw": "대",
+          "land_type": "residential",
+          "acquired_area_m2": 1242.108,
+          "estimated_land_price": 2669000.0,
+          "compensation_multiplier": 1.8,
+          "estimated_compensation": 5967335601.718,
+          "area_m2": 1242.108,
+          "price_per_m2": 2669000.0,
+          "price_source": "official",
+          "land_cost": 5967335601.718
+        }
+      ],
+      "warnings": [],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 112.481,
+    "surface_road_screen_cost": 0.0,
+    "new_road_screen_cost": 0.0,
+    "connector_screen_cost": 66.01,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 125.683,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R006-D",
+    "existing_road_length_km": 5.405,
+    "connector_length_km": 0.0,
+    "new_surface_road_length_km": 1.0,
+    "surface_road_length_km": 1.0,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 184.0,
+    "new_road_cost": 184.0,
+    "connector_cost": 0.0,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 184.0,
+    "surface_road_screen_cost": 230.0,
+    "new_road_screen_cost": 230.0,
+    "connector_screen_cost": 0.0,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 230.0,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R006-H",
+    "existing_road_length_km": 4.088,
+    "connector_length_km": 0.287,
+    "new_surface_road_length_km": 2.207,
+    "surface_road_length_km": 2.207,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 406.088,
+    "new_road_cost": 406.088,
+    "connector_cost": 52.808,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 458.896,
+    "surface_road_screen_cost": 507.61,
+    "new_road_screen_cost": 507.61,
+    "connector_screen_cost": 66.01,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 573.62,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R006-P",
+    "existing_road_length_km": 6.146,
+    "connector_length_km": 0.287,
+    "new_surface_road_length_km": 0,
+    "surface_road_length_km": 0,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 0.0,
+    "new_road_cost": 0.0,
+    "connector_cost": 52.808,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 59.673,
+    "land_compensation": {
+      "total_land_compensation": 5967335601.718,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 1,
+      "official_count": 1,
+      "estimated_count": 0,
+      "source_counts": {
+        "official": 1
+      },
+      "land_compensation_total": 5967335601.718,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 5967335601.718,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [
+        {
+          "pnu": "2641010700110530000",
+          "land_category_raw": "대",
+          "land_type": "residential",
+          "acquired_area_m2": 1242.108,
+          "estimated_land_price": 2669000.0,
+          "compensation_multiplier": 1.8,
+          "estimated_compensation": 5967335601.718,
+          "area_m2": 1242.108,
+          "price_per_m2": 2669000.0,
+          "price_source": "official",
+          "land_cost": 5967335601.718
+        }
+      ],
+      "warnings": [],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 112.481,
+    "surface_road_screen_cost": 0.0,
+    "new_road_screen_cost": 0.0,
+    "connector_screen_cost": 66.01,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 125.683,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R007-B",
+    "existing_road_length_km": 16.973,
+    "connector_length_km": 0.969,
+    "new_surface_road_length_km": 0.0,
+    "surface_road_length_km": 0.0,
+    "tunnel_length_km": 0.0,
+    "surface_road_cost": 0.0,
+    "new_road_cost": 0.0,
+    "connector_cost": 178.296,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 178.296,
+    "surface_road_screen_cost": 0.0,
+    "new_road_screen_cost": 0.0,
+    "connector_screen_cost": 222.87,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 222.87,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R007-D",
+    "existing_road_length_km": 2.003,
+    "connector_length_km": 0.0,
+    "new_surface_road_length_km": 4.828,
+    "surface_road_length_km": 4.828,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 888.352,
+    "new_road_cost": 888.352,
+    "connector_cost": 0.0,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 888.352,
+    "surface_road_screen_cost": 1110.44,
+    "new_road_screen_cost": 1110.44,
+    "connector_screen_cost": 0.0,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 1110.44,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
+      "f_aux": 1.05,
+      "road_contingency": 0.25,
+      "tunnel_contingency": 0.35,
+      "land_compensation_unit": "eok_krw"
+    }
+  },
+  {
+    "route_id": "R007-H",
+    "existing_road_length_km": 13.686,
+    "connector_length_km": 0.969,
+    "new_surface_road_length_km": 3.121,
+    "surface_road_length_km": 3.121,
+    "tunnel_length_km": 0,
+    "surface_road_cost": 574.264,
+    "new_road_cost": 574.264,
+    "connector_cost": 178.296,
+    "tunnel_cost": 0.0,
+    "land_compensation_cost": 0.0,
+    "land_compensation": {
+      "total_land_compensation": 0.0,
+      "factor": 1.5,
+      "road_width_m": 20.0,
+      "parcel_count": 0,
+      "official_count": 0,
+      "estimated_count": 0,
+      "source_counts": {},
+      "land_compensation_total": 0.0,
+      "land_compensation_by_land_type": {
+        "forest": 0.0,
+        "farmland": 0.0,
+        "residential": 0.0,
+        "commercial_industrial": 0.0,
+        "unknown": 0.0
+      },
+      "items": [],
+      "warnings": [
+        "편입 필지 조회 실패로 토지보상비를 0원으로 처리했습니다: VWorld parcel WFS JSON response could not be parsed."
+      ],
+      "region_filter": {
+        "enabled": true,
+        "selected_regions": [
+          "부산광역시"
+        ],
+        "buffer_km": 10.0
+      }
+    },
+    "total_direct_cost": 752.56,
+    "surface_road_screen_cost": 717.83,
+    "new_road_screen_cost": 717.83,
+    "connector_screen_cost": 222.87,
+    "tunnel_screen_cost": 0.0,
+    "total_screen_cost": 940.7,
+    "cost_assumptions": {
+      "unit": "eok_krw",
+      "road_unit_cost_eok_per_km": 184.0,
+      "tunnel_unit_cost_thousand_krw_per_m": 13940.0,
+      "f_urban": 1.0,
+      "f_speed": 1.0,
+      "f_ground": 1.3,
+      "f_length": 0.994,
       "f_aux": 1.05,
       "road_contingency": 0.25,
       "tunnel_contingency": 0.35,
