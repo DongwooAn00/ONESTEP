@@ -29,6 +29,7 @@ venv/
 !.env.example
 .DS_Store
 
+data/processed/
 data/raw/
 data/processed/csv/
 data/processed/shapefiles/

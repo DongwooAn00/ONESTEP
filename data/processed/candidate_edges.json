@@ -1,202 +1,202 @@
 [
   {
     "edge_id": "E001",
-    "from_node_id": "N003",
-    "to_node_id": "N019",
-    "straight_distance_km": 19.216,
-    "estimated_flow": 5346220.0,
+    "from_node_id": "N007",
+    "to_node_id": "N009",
+    "straight_distance_km": 8.74,
+    "estimated_flow": 186299.6,
     "rank": 1,
-    "od_count": 2388,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 32,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E002",
-    "from_node_id": "N018",
-    "to_node_id": "N031",
-    "straight_distance_km": 37.797,
-    "estimated_flow": 3257329.0,
+    "from_node_id": "N003",
+    "to_node_id": "N005",
+    "straight_distance_km": 5.069,
+    "estimated_flow": 123313.6,
     "rank": 2,
-    "od_count": 1963,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 528,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E003",
-    "from_node_id": "N036",
-    "to_node_id": "N054",
-    "straight_distance_km": 14.216,
-    "estimated_flow": 892774.8,
+    "from_node_id": "N009",
+    "to_node_id": "N018",
+    "straight_distance_km": 10.375,
+    "estimated_flow": 114034.6,
     "rank": 3,
-    "od_count": 10284,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 64,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E004",
-    "from_node_id": "N002",
-    "to_node_id": "N006",
-    "straight_distance_km": 8.856,
-    "estimated_flow": 888528.8,
+    "from_node_id": "N021",
+    "to_node_id": "N034",
+    "straight_distance_km": 6.108,
+    "estimated_flow": 94410.4,
     "rank": 4,
-    "od_count": 9937,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 140,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E005",
-    "from_node_id": "N001",
-    "to_node_id": "N010",
-    "straight_distance_km": 18.491,
-    "estimated_flow": 640911.2,
+    "from_node_id": "N015",
+    "to_node_id": "N029",
+    "straight_distance_km": 12.606,
+    "estimated_flow": 92267.8,
     "rank": 5,
-    "od_count": 10518,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 72,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E006",
-    "from_node_id": "N025",
-    "to_node_id": "N031",
-    "straight_distance_km": 5.116,
-    "estimated_flow": 570756.2,
+    "from_node_id": "N004",
+    "to_node_id": "N012",
+    "straight_distance_km": 5.455,
+    "estimated_flow": 86488.8,
     "rank": 6,
-    "od_count": 594,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 342,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E007",
     "from_node_id": "N010",
-    "to_node_id": "N021",
-    "straight_distance_km": 23.964,
-    "estimated_flow": 538073.2,
+    "to_node_id": "N022",
+    "straight_distance_km": 6.003,
+    "estimated_flow": 82628.2,
     "rank": 7,
-    "od_count": 19088,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 89,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E008",
-    "from_node_id": "N020",
-    "to_node_id": "N032",
-    "straight_distance_km": 18.756,
-    "estimated_flow": 496889.0,
+    "from_node_id": "N019",
+    "to_node_id": "N036",
+    "straight_distance_km": 12.201,
+    "estimated_flow": 75739.6,
     "rank": 8,
-    "od_count": 5376,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 12,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E009",
-    "from_node_id": "N022",
-    "to_node_id": "N024",
-    "straight_distance_km": 12.321,
-    "estimated_flow": 469066.0,
+    "from_node_id": "N006",
+    "to_node_id": "N015",
+    "straight_distance_km": 7.907,
+    "estimated_flow": 73680.4,
     "rank": 9,
-    "od_count": 4679,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 192,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E010",
     "from_node_id": "N009",
-    "to_node_id": "N037",
-    "straight_distance_km": 8.012,
-    "estimated_flow": 451259.6,
+    "to_node_id": "N025",
+    "straight_distance_km": 13.246,
+    "estimated_flow": 71916.0,
     "rank": 10,
-    "od_count": 6448,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 40,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E011",
-    "from_node_id": "N011",
-    "to_node_id": "N022",
-    "straight_distance_km": 14.262,
-    "estimated_flow": 445002.6,
+    "from_node_id": "N001",
+    "to_node_id": "N005",
+    "straight_distance_km": 5.776,
+    "estimated_flow": 71005.0,
     "rank": 11,
-    "od_count": 9769,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 528,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E012",
     "from_node_id": "N023",
-    "to_node_id": "N040",
-    "straight_distance_km": 5.607,
-    "estimated_flow": 422263.4,
+    "to_node_id": "N032",
+    "straight_distance_km": 7.666,
+    "estimated_flow": 70557.2,
     "rank": 12,
-    "od_count": 2301,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 16,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E013",
-    "from_node_id": "N003",
-    "to_node_id": "N007",
-    "straight_distance_km": 14.554,
-    "estimated_flow": 386837.6,
+    "from_node_id": "N005",
+    "to_node_id": "N033",
+    "straight_distance_km": 5.28,
+    "estimated_flow": 69079.0,
     "rank": 13,
-    "od_count": 3173,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 836,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E014",
-    "from_node_id": "N041",
-    "to_node_id": "N049",
-    "straight_distance_km": 18.367,
-    "estimated_flow": 385522.0,
+    "from_node_id": "N007",
+    "to_node_id": "N025",
+    "straight_distance_km": 11.652,
+    "estimated_flow": 65773.8,
     "rank": 14,
-    "od_count": 1808,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 40,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E015",
-    "from_node_id": "N004",
-    "to_node_id": "N031",
-    "straight_distance_km": 9.668,
-    "estimated_flow": 372694.2,
+    "from_node_id": "N016",
+    "to_node_id": "N026",
+    "straight_distance_km": 6.945,
+    "estimated_flow": 65456.2,
     "rank": 15,
-    "od_count": 1046,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 84,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E016",
-    "from_node_id": "N011",
-    "to_node_id": "N021",
-    "straight_distance_km": 8.081,
-    "estimated_flow": 372691.0,
+    "from_node_id": "N003",
+    "to_node_id": "N004",
+    "straight_distance_km": 5.281,
+    "estimated_flow": 64028.2,
     "rank": 16,
-    "od_count": 10886,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 456,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E017",
-    "from_node_id": "N024",
-    "to_node_id": "N040",
-    "straight_distance_km": 15.95,
-    "estimated_flow": 362954.6,
+    "from_node_id": "N004",
+    "to_node_id": "N005",
+    "straight_distance_km": 6.607,
+    "estimated_flow": 61853.6,
     "rank": 17,
-    "od_count": 8477,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 836,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E018",
-    "from_node_id": "N024",
-    "to_node_id": "N037",
-    "straight_distance_km": 15.02,
-    "estimated_flow": 356516.4,
+    "from_node_id": "N002",
+    "to_node_id": "N026",
+    "straight_distance_km": 5.512,
+    "estimated_flow": 60639.8,
     "rank": 18,
-    "od_count": 5566,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 300,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E019",
-    "from_node_id": "N043",
-    "to_node_id": "N050",
-    "straight_distance_km": 7.76,
-    "estimated_flow": 352864.8,
+    "from_node_id": "N012",
+    "to_node_id": "N021",
+    "straight_distance_km": 5.703,
+    "estimated_flow": 56369.8,
     "rank": 19,
-    "od_count": 2235,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 180,
+    "source": "region_filtered_od_weighted_kmeans"
   },
   {
     "edge_id": "E020",
-    "from_node_id": "N005",
-    "to_node_id": "N026",
-    "straight_distance_km": 7.791,
-    "estimated_flow": 346341.0,
+    "from_node_id": "N023",
+    "to_node_id": "N031",
+    "straight_distance_km": 17.854,
+    "estimated_flow": 51140.8,
     "rank": 20,
-    "od_count": 1404,
-    "source": "all_od_weighted_kmeans"
+    "od_count": 26,
+    "source": "region_filtered_od_weighted_kmeans"
   }
 ]
